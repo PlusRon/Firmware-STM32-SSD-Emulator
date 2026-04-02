@@ -23,21 +23,21 @@ SECTIONS
         _etext = .;           /* record the end-point of .text-section (will be the start-point of .data-section's LMA) */
     } > FLASH
 
-    /* .data 段是「有初始值的全域變數」，存於 Flash，執行時搬到 RAM */
+    /* .data-section(be initialized global-variable), LMA stored in FLASH, and VMA be move into RAM while executing */
     .data : {
-        . = ALIGN(4); /* 確保 VMA 起始位址對齊 */
-        _sdata = .;         /* 紀錄在 RAM 的起始點 */
+        . = ALIGN(4);         /* VMA's begin align be sure */
+        _sdata = .;           /* record the start-point of .data-section in RAM */
         *(.data*)
-        . = ALIGN(4); /* 確保 VMA 結束位址對齊 */
-        _edata = .;         /* 紀錄在 RAM 的結束點 */
-    } > RAM AT > FLASH      /* AT 代表在 Flash 裡的原始位置 (LMA) */
+        . = ALIGN(4);         /* VMA's final align be sure */
+        _edata = .;           /* record the end-point of .data-section in RAM */
+    } > RAM AT > FLASH        /* AT represent the original position(LMA) at FLASH */
 
-    /* .bss 段是「未初始化的全域變數」，直接放在 RAM */
+    /* .bss-section(be un-initialized global-variable), stored in RAM(LMA = VMA) directly */
     .bss : {
         . = ALIGN(4);
         _sbss = .;
         *(.bss*)
-        *(COMMON)           /* 【重要修正】收集「嘗試性定義」的全域變數 */
+        *(COMMON)             /* collect the global-variable of Tentative Definition */
         . = ALIGN(4);
         _ebss = .;
     } > RAM
