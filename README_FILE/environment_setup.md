@@ -63,8 +63,18 @@ Linux 預設僅允許 `root` 存取底層硬體。為了讓開發者能以一般
   - 查看檔案權限
     ```
     # 假設裝置在 Bus 001, Device 005
-    ls -l /dev/bus/usb/001/005
+    ls -l /dev/bus/usb/001/005 或 ll /dev/bus/usb/001/005 或 ls -lh /dev/bus/usb/001/005
+    : crw-rw-rw- 1 root root ...
     ```
+    - 檔案屬性第一字元代表檔案類型
+      - `c` (Character Device) ： 字元設備檔案，傳輸資料以字元為單位，例如 `/dev/tty`
+      - `d` (Directory) ： 目錄，用於組織檔案的目錄結構
+      - `-` (Regular File) ： 普通檔案，如文字檔、執行檔、影像檔等
+      - `b` (Block Device)：區塊設備檔案，儲存資料以區塊為單位，可隨機存取，例如硬碟 `/dev/sda`
+      - `p` (Pipe)：具名管道，用於程序間通信（FIFO）
+      - l (Symbolic Link)：符號連結，類似 Windows 的捷徑
+    
+    - 最後的 `rw-rw-rw-`(**User-Group-Others**) 代表現在不需要 sudo 也能直接進行燒錄
 
 
 
