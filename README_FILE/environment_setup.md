@@ -20,14 +20,19 @@ sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi gdb-multiarch
 sudo apt install openocd stlink-tools
 ```
 - OpenOCD: 強大的除錯與自動化測試工具，可做燒錄
-  - 將編譯好的機器碼(.bin)透過 USB 塞進開發版的 Flash 記憶體中
-  - 作為 GDB(電腦) 與硬體(開發板)間的橋樑（預設 Port 3333）
+  - 可燒錄，將編譯好的機器碼(.bin)透過 USB 塞進開發版的 Flash 記憶體中，但指令比較長 `program filename.elf verify reset exit`
+  - 作為 GDB(電腦) 與硬體(開發板)間的橋樑（預設的 GDB Server 為 `Port 3333`），非常穩定
+  - GDB 支援各種複雜的斷點、讀取記憶體位址，甚至是透過腳本自動化測試硬體
 - stlink-tools: 提供極其簡便的 st-flash 工具，適合快速上傳 .bin 檔案
+  - `st-flash` 指令非常好用
+  - `st-util` 指令會開一個 GDB Server `Port 4242`，讓 gdb-multiarch 也可連
 
 ### 安裝專案管理與通訊工具
 ```
 sudo apt install make git minicom
 ```
+- make : 自動化管理，根據清單跑
+- minicom : 可在 Linux 視窗看到開發板用 UART 傳回來的文字訊息
 ### 硬體連線確認
 將 **STM32F072 Discovery** 開發板透過 USB 連接至電腦，使用 `lsusb` 指令確認系統是否成功偵測到 ST-LINK 偵錯器
 ```
