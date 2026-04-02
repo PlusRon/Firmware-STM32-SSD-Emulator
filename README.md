@@ -17,4 +17,4 @@ Firmware-STM32-SSD-Emulator
   - `SECTIONS` : 定義程式碼段落（Sections）的擺放順序。
   - `KEEP` : 強制連結器保留特定區段（如 **中斷向量表**），防止被 **Garbage Collection** 刪除
   - `ALIGN(4)` : 強迫資料從 **4 位元組對齊** 的位址開始，確保 **CPU 最高效率存取**
-- [Linker Script 實作]()
+- [Linker Script 實作](README_FILE/linker_script.md)
