@@ -11,13 +11,16 @@ sudo apt update
 sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi gdb-multiarch
 ```
 - `gcc-arm-none-eabi`: **交叉編譯器**，可以將在 Linux 寫的 C 語言 轉成STM32懂得機械器碼，`none`無作業系統之意
-- `binutils-arm-none-eabi`: 包含 **連結器（ld）** 與 **二進位轉換工具（objcopy）**
-- `gdb-multiarch`: 跨架構 之 除錯器
+- `binutils-arm-none-eabi`: 包含 **連結器（ld）** 與 **二進位轉換工具（objcopy）**，將編譯後的零件組成完整檔案
+- `gdb-multiarch`: 跨架構 之 除錯器，可在 x86 電腦上除錯開發板上（ARM）跑的程式
+  - 透過 OpenOCD 從電腦開一個門(`port 3333`) 連上開發板，就可以在電腦螢幕上看到開發板內部暫存器的數值、設斷點、單步執行
 ### 安裝燒錄與除錯橋樑 (Debugging Bridge)
 ```
 sudo apt install openocd stlink-tools
 ```
-- OpenOCD: 強大的除錯與自動化測試工具，作為 GDB 與硬體間的橋樑（預設 Port 3333）
+- OpenOCD: 強大的除錯與自動化測試工具，可做燒錄
+  - 將編譯好的機器碼(.bin)透過 USB 塞進開發版的 Flash 記憶體中
+  - 作為 GDB(電腦) 與硬體(開發板)間的橋樑（預設 Port 3333）
 - stlink-tools: 提供極其簡便的 st-flash 工具，適合快速上傳 .bin 檔案
 
 ### 安裝專案管理與通訊工具
