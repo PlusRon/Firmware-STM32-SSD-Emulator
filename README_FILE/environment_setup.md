@@ -39,30 +39,52 @@ sudo apt install make git minicom
 lsusb
 : Bus 001 Device 005: ID 0483:3748 STMicroelectronics ST-LINK/V2.1
 ```
-- 記下 `VID: 0483` 與 `PID: 3748`，這將用於下一步的權限設定
+- 記下 `VID: 0483` 與 `PID: 3748`，這將用於下一步的權限設定(燒錄之權限)
 
 ### 設定 USB 存取權限 (udev rules)
-Linux 預設僅允許 `root` 存取底層硬體。為了讓開發者能以一般使用者身分進行燒錄，需設定 `udev` 規則
+Linux 預設不認識 STM32，只知道有裝置連接不知道是開發工具，且預設僅允許 `root` 存取底層硬體。為了讓開發者能以一般使用者身分進行燒錄，需設定 `udev` 規則
 - #### 建立規則檔案
   - 在系統設定目錄 /etc/udev/rules.d/ 下建立一個新規則
     ```
     sudo vim /etc/udev/rules.d/45-stlinkv2.rules
     ```
-- #### 寫入設備描述符
+    - **etc (Editable Text Configuration)** : 存放系統層級設定檔，裡面的檔案都是純文字檔，可以 vim 和 nano 編輯
+      - ‵/etc/udev/`：定義 USB 裝置（如 ST-LINK）插進後，應該給的權限
+      - ‵/etc/fstab`：定義硬碟、隨身碟開機時要掛載（Mount）到哪個資料夾
+      - `45` 代表優先順序（數字越小越先執行），
+      - 可用 `ls -F /etc/` 指令利用前綴分辨檔案屬性
+        - `/` : 目錄
+        - `*` : 程式執行檔(編譯器、腳本)
+        - `@` : 軟連結、捷徑
+      - 清單篩選 `ls -alF /usr/bin/ | grep arm-none-eabi`、`ll /usr/bin/ | grep arm-none-eabi` 
+- #### 對 `45-stlinkv2.rules` 寫入設備描述符
   - 透過屬性過濾器（Filter List）匹配 ST-LINK，並賦予 `0666` (讀寫) 權限
     ```
     # ST-Link V2.1 權限設定
     SUBSYSTEMS=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="374b", MODE="0666"
     ```
-- #### 重新載入守護進程 (Daemon)
-  - 叫醒負責管理硬體裝置的管家 `udevd`，讓新規則立即生效
+- #### 重新載入守護進程 (Daemon, 後台運行的程式)
+  - **守護進程（Daemon，後台運行的程式）**: 以小寫字母 d 結尾
+    - 可用 `ps`（Process Status）指令來抓出後台管家
+      ```
+      ps -ef | grep "d$"
+      ````
+      - `udevd`：負責處理硬體裝置（如你的 ST-LINK）插拔
+      - `sshd`：負責處理遠端連線（SSH）的插拔
+      - `systemd`：管理所有其他管家的 總管
+  - 透過管理硬體裝置的管家，讓新規則立即生效
     ```
     sudo udevadm control --reload-rules
     ```
+    - `udevadm`: 為 udev（裝置管理員）的控制工具（Admin）
+    - `control`: 對 Daemo 下達控制命令
+    - `--reload-rules`: 強制 Daemo 重新載入規則
   - 強制對現有裝置觸發規則(模擬硬體重插拔)
     ```
     sudo udevadm trigger
     ```
+    - udev 是事件驅動（Event-driven）的，只會對之後插上的裝置生效
+    - 對於 已經插著的裝置，必須手動執行 udevadm trigger 讓核心重新發送 uevent，強制系統套用新規則
 - #### 權限檢查
   - 先透過 lsusb 找到裝置所在的 Bus 與 Device 編號
     ```
