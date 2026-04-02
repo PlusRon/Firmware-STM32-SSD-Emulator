@@ -13,7 +13,8 @@ sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi gdb-multiarch
 - `gcc-arm-none-eabi`: **交叉編譯器**，可以將在 Linux 寫的 C 語言 轉成STM32懂得機械器碼，`none`無作業系統之意
 - `binutils-arm-none-eabi`: 包含 **連結器（ld）** 與 **二進位轉換工具（objcopy）**，將編譯後的零件組成完整檔案
 - `gdb-multiarch`: 跨架構 之 除錯器，可在 x86 電腦上除錯開發板上（ARM）跑的程式
-  - 透過 OpenOCD 從電腦開一個門(`port 3333`) 連上開發板，就可以在電腦螢幕上看到開發板內部暫存器的數值、設斷點、單步執行
+  - 透過 OpenOCD 從電腦開一個門(`port 3333`) 連上開發板
+  - 就可以在電腦螢幕上看到開發板內部暫存器的數值、設斷點、單步執行
 ### 安裝燒錄與除錯橋樑 (Debugging Bridge)
 ```
 sudo apt install openocd stlink-tools
