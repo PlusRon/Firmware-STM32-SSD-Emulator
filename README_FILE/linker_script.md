@@ -43,6 +43,14 @@ SECTIONS
     } > RAM
 }
 ```
+#### 語言撰寫
+- 記憶體(MEMORY)中的區塊名稱（可以改）
+  - `FLASH`, `RAM`, `SRAM`, `ITCM`，自行取的代號
+- 段落(SECTIONS)中的結構名稱 （可自訂）
+  -`.text`, `.data`, `.bss`，為慣用名稱，但連結器並不強制要求結構名稱
+- 符號 (Symbols) （可自訂）
+  - `_stext`, `_etext`, `_sdata`, `_edata`, `_estack`
+  - 提供給 `startup.c` 使用的 地址變數名
 #### 為何 .data-section 需要同時定義 **VMA (虛擬位址)** 與 **LMA (載入位址)** ?
 - 燒錄階段 (Static Storage)
   - 所有的 .text 與 .data 的初始值都儲存在 FLASH。這時 FLASH 是唯一的倉庫
