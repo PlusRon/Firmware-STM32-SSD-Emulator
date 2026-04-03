@@ -109,9 +109,17 @@ typedef struct {
     - **GPIOC->ODR** 的最終地址: **0x48000814**
       - ODR 的 Bit 6 會連接到一個 **輸出驅動器 (Output Driver)** 電路，負責把電壓送到 Pin 6
   
- 
-
-
+## 二、系統架構：AHB 與 APB 資料高速公路
+STM32 內部透過不同的匯流排（Bus）平衡效能與功耗
+- AHB (Advanced High-performance Bus)
+  - 特性 ： 高頻寬、低延遲，掛在系統時鐘下
+  - 對象 ： **Flash、RAM、DMA、GPIO**（為了最快開關）
+- APB (Advanced Peripheral Bus)
+  - 特性 ： 速度較 **慢** 但 **省電**，透過預分頻器運作
+  - 對象 ： UART、SPI、I2C、Timers、ADC
+- 為什麼要區分？
+  - 為了功耗與電磁干擾 (EMI) 的權衡
+  - **高速訊號線翻轉非常耗電**，將低速設備（如 UART）放在 APB 上可大幅 **延長電力壽命**
 
 
 
