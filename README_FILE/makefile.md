@@ -102,7 +102,7 @@ clean:
     
     CFLAGS  = -mcpu=cortex-m0 -mthumb -Iinclude -g -O0 -Wall -ffunction-sections -fdata-sections
     ```
-  - **預設目標 (Default Target)** : 放在最上面，**不加參數直接輸入 make** 時，會跑 **第一個看到的目標**
+  - **預設目標 (Default Target)** : 放在最上面，**不加參數直接輸入 make** 時，會跑 **第一個看到的目標**，作為 **進入點**
     ```
     all: $(BUILD_DIR)/project.bin
     ```
@@ -123,7 +123,7 @@ clean:
     clean:
         rm -rf $(BUILD_DIR)
     ```
-## 二、關鍵函數與參數解析
+## 二、關鍵函數,參數解析,程式邏輯
 - #### 自動化函數
   - **wildcard** (搜集員)
     - `SRCS = $(wildcard app/*.c)` 會掃描硬碟，找出所有**真實存在的原始碼**
@@ -132,11 +132,26 @@ clean:
     - `app/*.c` ： 搜尋模式，`*` 萬用符號，代表 任何字元。找出 `app/` 資料夾下，所有 `.c` 結尾的檔案
   - **patsubst** (計畫員)
     - `OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRCS))` 在記憶體中預先畫好一張 待產清單，**定義未來 `.o` 的存放位置**
+    - 建立 **模式規則 (Pattern Rules)**，讓每個 .c 獨立編譯成一個 .o 檔
+    - 當只改動 `main.c` 時，make 只會重新編譯 `main.o`，而不會去動其他的 `startup.o`，這能大幅縮短大型專案的編譯時間
 - #### 連結器的斷捨離
-  - **-nostdlib**
+  -  **`-ffunction-sections`**
+    - 告訴編譯器把 **每個函式** 放在 **獨立的小隔間**
+  - **`-nostdlib`**
     - 韌體開發中，需要 **極致控制權**，避開龐大的電腦標準庫，使二進位檔體積從 **幾百 KB** 壓縮至 **幾 KB**
-  - **-Wl,--gc-sections**
+  - **`-Wl,--gc-sections`**
+    - 是 **Garbage Collection**
     - Linker 會掃描所有被獨立裝箱 (**-ffunction-sections**) 的函式，若發現沒被呼叫（例如沒用到的 `delay()`），就會直接將其剔除，節省 Flash
+- #### 參數解析
+  - **`$@`** : 為 **自動變數**，代表 **目標名稱**
+  - **`$<`** : 為 **自動變數**，代表 **第一個依賴項**
+- #### 硬體操作指令
+  - **`flash: $(BUILD_DIR)/project.bin`** : 當輸入 `make flash` 時 `make` 會先去檢查 `.bin` 是否為最新，若不是（你改了程式），會自動先跑編譯，編譯完才跑 openocd 燒錄，保證燒進去的一定是最新版
+  - **`-c "program $< verify reset exit 0x08000000"`**
+    - `program $<` : 燒錄第一個依賴檔
+    - `verify` : 燒完檢查對不對
+    - `reset` : 最重要，讓晶片自動重啟，LED 才會立刻開始閃
+    - `exit` : 燒完自動結束 OpenOCD，不會卡在終端機
 ## 三、從 ELF 到 BIN
 - #### ELF (Executable and Linkable Format)
   - 包含 **機器碼** + **符號表** + **除錯資訊**
