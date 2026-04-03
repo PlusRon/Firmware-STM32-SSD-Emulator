@@ -42,5 +42,25 @@ SECTIONS
         _ebss = .;
     } > RAM
 }
-
 ```
+#### 為何 .data-section 需要同時定義 **VMA (虛擬位址)** 與 **LMA (載入位址)** ?
+- 燒錄階段 (Static Storage)
+  - 所有的 .text 與 .data 的初始值都儲存在 FLASH。這時 FLASH 是唯一的倉庫
+- 啟動階段 (Move Process)
+  - 按下 Reset 後，CPU 執行 `startup.c` 中的 `Reset_Handler()`
+  - 根據 Linker Script 提供的符號（`_sidata`, `_sdata`, `_edata`），將變數初始值從 FLASH 搬移到 RAM
+- 執行階段 (Execution)
+  - 進入 main() 後，CPU 直接存取 RAM 中的變數
+  - RAM 的存取速度遠高於 FLASH
+#### 為何 SSD 韌體關鍵程式碼要跑在 RAM？
+- FLASH 必須先 **擦除** 才能 **寫入**，且讀取速度較慢
+- 為了讓 SSD 達極限讀寫效能，關鍵的 **FTL 查表** 與 **ECC 糾錯演算法** 都會像 .data 一樣，在**開機後搬移至 RAM（或 ITCM）中執行**
+
+#### 檢查編譯後的某個目標檔案，其各個 抽屜 的 大小與分配
+```
+arm-none-eabi-objdump -h build/main.o
+```
+- 顯示 .text, .data, .bss 各自佔用的空間
+
+
+
