@@ -58,15 +58,22 @@ SECTIONS
     
 - **段落(SECTIONS)**
   - **Regoin 結構名稱** : `.text`, `.data`, `.bss`，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
-    - `.text` :  在 FLASH 裡規劃一個 .text-region
+    - `.text` :  在 FLASH 裡規劃一個 **.text-region**
       - 在所有編譯好的檔案中找到標籤為 `.isr_vector` 的檔案，放到 FLASH 最前面，且不准刪掉
         - `.isr_vector` 會在 `startup.c` 中定義的段落名稱，專門放 **中斷向量（Reset, NMI, HardFault 等位址）**
         - `KEEP(...)` : 因為連結器有 Garbage Collection 功能。如果連結器發現 `main()` 沒用到某個函式，為了省空間會把它刪掉
-      - `*(.text*)`將標籤開頭是 `.text` 的機器碼(`.o`)排在向量表後面
+      - `*(.text*)` : 將標籤開頭是 `.text` 的機器碼(`.o`)排在向量表後面
         - 第一個 `*`（檔案過濾器）: 所有的輸入檔案(.o)
         - `.text*` : 不管是 `.text` 還是 `.text.什麼什麼`，全部一網打盡
-      - `*(.rodata*)` : 常數
-      - `. = ALIGN(4);` : 將存放 程式碼的 .text-region 起始處 與 結束處 對齊 4 的倍數 (FLASH 對齊)，以提高效率
+      - `*(.rodata*)` : 唯讀資料 (常數、字串)
+      - `. = ALIGN(4);` : 將存放 程式碼的 **.text-region** 起始處 與 結束處 對齊 4 的倍數 (FLASH 對齊)，以提高效率
+      - `_etext = .;` : 取出經過對齊後的 **.text-region** 之結束位址，作為 下一個 存放 已初始化全域變數 **.data-region** 在 FLASH 中的起始位址對齊
+      - `> FLASH` : **.text-region** 的 **LMA 等於 VMA**
+    - `.data` : LMA 存放於 FLASH，程式執行時會透過 Reset_Handler 的函式將資料 VMA 搬移至 RAM (C 語言中，有初始值的全域變數，會被歸類到這裡)
+      - `_sdata = .` : `.` 代表RAM 當前位置的地址，記錄下未來程式執行階段時，將會分配至 RAM 資料段之起點地址 `0x20000000`
+      - `*(.data*)` : 收集所有 **初始值的全域變數**，分配空間給他們
+      - `_edata = .` : 放完所有 初始值之全域變數的檔案資料後，再次記錄 **當前位置**。
+        - `startup.c` 計算 `_edata - _sdata`，就知道總共要從 FLASH 搬多少 Byte 到 RAM 裡
   - **符號 (Symbols)** : Region 中的變數名
     - `_stext`, `_etext`, `_sdata`, `_edata`, `_estack` （可自訂）
     - 提供給 `startup.c` 使用的 地址變數名
