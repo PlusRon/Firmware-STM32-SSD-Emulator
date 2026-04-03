@@ -89,7 +89,11 @@ SECTIONS
     - 所以在 Linker Script 的 .bss 結構裡通常會寫 `*(COMMON)`
 #### 為何 .data-section 需要同時定義 **VMA (虛擬位址)** 與 **LMA (載入位址)** ?
 - 燒錄階段 (Static Storage)
-  - 所有的 .text 與 .data 的初始值都儲存在 FLASH。這時 FLASH 是唯一的倉庫
+  - FLASH 是唯一的倉庫，所有的 **.text** 與 **.data** 的初始值都儲存在 FLASH
+    - **.text** ： 存放在 FLASH 前面
+    - **.data** ： 緊跟在 .text 後面，也存在 FLASH 裡
+  - 透過 **SWD/JTAG** 介面，使用 OpenOCD 或燒錄器完成
+  - 燒錄器會下達 **特殊的硬體命令**（**FLASH Controller**）來 **解鎖 FLASH** 並寫入資料，這時不受 Linker Script 的權限屬性限制
 - 啟動階段 (Move Process)
   - 按下 Reset 後，CPU 執行 `startup.c` 中的 `Reset_Handler()`
   - 根據 Linker Script 提供的符號（`_sidata`, `_sdata`, `_edata`），將變數初始值從 FLASH 搬移到 RAM
