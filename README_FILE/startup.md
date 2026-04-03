@@ -24,45 +24,46 @@ void system_soft_reset(void) {
     // Enter the infinite-loop to waiting for reset
     while(1);
 }
-/* 當 CPU 復位 (Reset) 或上電時執行的第一個函式 */
+/* Execute this first function while CPU-reset or power-on */
 void Reset_Handler(void) {
 
-    // 1. 搬移 .data 段：將「有初始值的全域變數」從 Flash 複製到 RAM
-    // 例如：int count = 100; 這個 100 必須從 Flash 搬到 RAM，程式才能正確讀寫
-    uint32_t *src = &_etext;
-    uint32_t *dest = &_sdata;
+    // 1. move .data-section : copy initial-global-variable from Flash to RAM
+    // Ex : int count = 100; this 100 have to copy from FLASH to RAM, then program to be read/write correctly
+    uint32_t *src = &_etext;   // LMA
+    uint32_t *dest = &_sdata;  // VMA
 
     while (dest < &_edata) {
         *dest++ = *src++;
     }
 
-    // 2. 初始化 .bss 段：將「未初始化的全域變數」清零
-    // 例如：int buffer[10]; 這裡會確保它們開機時全是 0
+    // 2. initialize the .bss-section : clear the uninitial-global-variable to be zero
+    // Ex : int buffer[10]; all of them be zero when power on
     dest = &_sbss;
     while (dest < &_ebss) {
         *dest++ = 0;
     }
 
-    // 3. 系統初始化完成，跳轉到 C 語言層級的 main 函式
+    // 3. Finish system initialization, jump to main() function of C-language-layer
     main();
-    /* --- 保護機制強化 --- */
 
-    // 如果 main 意外結束，代表系統邏輯發生重大異常
-    // 在進入死迴圈之前，我們可以選擇：
-    // A. 觸發軟體重置 (讓系統即刻重啟)
+
+    /* --- Strengthen the protection machanism --- */
+    // if main() unexpected ending, represent the the major anomaly occured in the system logic
+    // Before enter in the dead-loop, we can :
+
+    // A. Trigger the software-reset (Let system restart immediately)
     system_soft_reset(); 
 
-    // B. 或者維持原地踏步，等待看門狗 (Watchdog) 發現這裡沒有餵狗動作，進而發動硬體重置
-    // 4. 保護機制：如果 main() 意外結束返回，讓 CPU 進入無窮迴圈（防止跑飛）
+    // B. Alternatively remain stationary, waiting for Watchdog detect to trigger the hardware reset
     while (1);
 }
 
-/* 中斷向量表 (Vector Table) */
-/* 使用 attribute 確保這段資料被放在 Linker Script 指定的 .isr_vector 抽屜裡 */
+/* Interrupt Vector Table */
+/* Use the attribute ensure the data is placed in the .isr_vector-region that specified by Linker Script */
 __attribute__ ((section(".isr_vector")))
 uint32_t vector_table[] = {
-    0x20004000,              // 0. 初始堆疊指標 (MSP): RAM 頂端 (0x20000000 + 16KB)
-    (uint32_t)Reset_Handler  // 1. Reset 向量：開機後 CPU 第一步會跳轉到這裡
+    0x20004000,               // 0. initial Stack Point(MSP) : top of RAM (0x20000000 + 16KB)
+    (uint32_t)Reset_Handler   // 1. Reset Vector : CPU first jump to this location after power-on
 };
 
 ```
