@@ -107,7 +107,7 @@ void Reset_Handler(void) {
     while (1);
 }
 ```
-## 三、防禦性編程 (Defensive Programming) : 自動恢復與軟體重置 (進階韌體)
+## 三、防禦性編程 (Defensive Programming) : 自動恢復與軟體重置
 在 SSD 韌體開發中，**資料可用性 (Data Availability)** 至關重要。若程式邏輯發生**異常意外從 `main()` 退出**，必須追求 **即時恢復 (Instant Recovery)**，而非空轉 `while(1)` 等待 看門狗(Watchdog)
 - **軟體觸發重置 (AIRCR 操作)**
   - 接操作 ARM Cortex-M 內核的 **系統控制區 (SCS)**
