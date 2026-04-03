@@ -1,4 +1,5 @@
 # Makefile 兩階段編譯、燒入實作
+採用了 **兩階段編譯（`.c` → `.o` → `.elf`）**，並整合了 `wildcard` 與 `patsubst` 函數
 ```
 # 1. 工具鏈與工具定義
 CC      = arm-none-eabi-gcc
@@ -68,3 +69,34 @@ clean:
     rm -rf $(BUILD_DIR)
 
 ```
+## 一、運作機制 ： Makefile 為 有向無環圖 (DAG)
+- #### 依賴關係鏈 (Dependency Chain)
+  - `all` → `project.bin` → `project.elf` → `main.o` → `main.c`
+  - 這像剝洋蔥一樣，從最終產物往回追溯原料
+- #### 時間戳記檢查 (Timestamp Checking)
+  - **增量編譯 (Incremental Build)** ： Make 會比對 main.c 與 main.o 的修改時間
+  - 如果 依賴檔 `.c` 的更新時間新於 目標檔 `.o`，針對該檔重新編譯，否則跳過該編譯步驟，可大幅縮短開發迴圈時間
+## 二、關鍵函數與參數解析
+- #### 自動化函數
+  - **wildcard** (搜集員)
+    - `SRCS = $(wildcard app/*.c)` 會掃描硬碟，找出所有**真實存在的原始碼**
+  - **patsubst** (計畫員)
+    - `OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRCS))` 在記憶體中預先畫好一張 待產清單，**定義未來 .o 的存放位置**
+- #### 連結器的斷捨離
+  - **-nostdlib**
+    - 韌體開發中，需要 **極致控制權**，避開龐大的電腦標準庫，使二進位檔體積從 **幾百 KB** 壓縮至 **幾 KB**
+  - **-Wl,--gc-sections**
+    - Linker 會掃描所有被獨立裝箱 (**-ffunction-sections**) 的函式，若發現沒被呼叫（例如沒用到的 `delay()`），就會直接將其剔除，節省 Flash
+## 三、從 ELF 到 BIN
+- #### ELF (Executable and Linkable Format)
+  - 包含 **機器碼** + **符號表** + **除錯資訊**
+  - 檔案很大，是給 **除錯器（GDB）** 看的
+- #### BIN (Binary)
+  - 純粹的機器碼
+  - **丟掉** 所有人類 **可讀標籤**，只留下 0 與 1
+  - 能**燒進 STM32 Flash** 執行（從 **0x08000000** 開始）的東西
+
+
+
+
+
