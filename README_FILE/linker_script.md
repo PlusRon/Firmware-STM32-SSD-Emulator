@@ -9,7 +9,7 @@ MEMORY
     RAM  (rwx) : ORIGIN = 0x20000000, LENGTH = 16K
 }
 
-/* 2. Define Order of Code-Text Section */
+/* 2. Define Order of Code-Section */
 SECTIONS
 {
     /* .text-section have to start at FLASH head */
@@ -46,6 +46,8 @@ SECTIONS
 ### 語言撰寫
 - **記憶體(MEMORY)** 
   - 區塊名稱 : `FLASH`, `RAM`, `SRAM`, `ITCM`， (可改自行取的代號)
+    - `FLASH` : 程式執行期間，該房間的家具無法移動，僅供查看
+    - `RAM` : 程式執行期間，該房間的家具可移動，可讀寫
   - 區塊屬性 (程式 **執行階段**，CPU 對該區域的 **訪問權限**)
     |關鍵字|意義|功能說明|
     |:---:|:---:|:---|
@@ -59,6 +61,10 @@ SECTIONS
   - 符號 (Symbols) 
     - `_stext`, `_etext`, `_sdata`, `_edata`, `_estack` （可自訂）
     - 提供給 `startup.c` 使用的 地址變數名
+  - COMMON 段落 : 撰寫 `int x;` 卻沒給初值，它一定會進 .bss 嗎?
+    - 某些 GCC 配置下，**未初始化的全域變數** 會先被放在一個叫 COMMON 的暫時段落
+    - 最後 Linker 進行連結時，才會根據 Linker Script 的指示，把 COMMON 併入 .bss 段落中
+    - 所以在 Linker Script 的 .bss 結構裡通常會寫 `*(COMMON)`
 #### 為何 .data-section 需要同時定義 **VMA (虛擬位址)** 與 **LMA (載入位址)** ?
 - 燒錄階段 (Static Storage)
   - 所有的 .text 與 .data 的初始值都儲存在 FLASH。這時 FLASH 是唯一的倉庫
@@ -72,11 +78,12 @@ SECTIONS
 - FLASH 必須先 **擦除** 才能 **寫入**，且讀取速度較慢
 - 為了讓 SSD 達極限讀寫效能，關鍵的 **FTL 查表** 與 **ECC 糾錯演算法** 都會像 .data 一樣，在**開機後搬移至 RAM（或 ITCM）中執行**
 
-#### 檢查編譯後的某個目標檔案，其各個 抽屜 的 大小與分配
+#### 檢查編譯後的某個目標檔案，其各個 抽屜(`.text`, `.data`, `.bss`) 的 大小與分配
 ```
 arm-none-eabi-objdump -h build/main.o
 ```
 - 顯示 .text, .data, .bss 各自佔用的空間
+- `-h` 代表查看 Header（標頭）
 
 
 
