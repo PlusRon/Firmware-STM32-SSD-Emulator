@@ -127,16 +127,16 @@ arm-none-eabi-objdump -h build/main.o
 ### 三、計算機架構 - 硬體架構與記憶體映射 (Memory Mapping)
 撰寫 Linker Script 時，定義的 `FLASH (rx)` 與 `RAM (rwx)`，不只是軟體設定，而是對應到微處理器底層的 **匯流排架構 (Bus Architecture)** 與 **位址解碼機制**
 #### 改良型哈佛架構 (Modified Harvard Architecture)
-- STM32 採用改良型哈佛架構，其核心特徵在於物理路徑 **完全獨立**
-  - **指令匯流排 (I-Bus)** ： 物理線路直接連接至 Internal Flash，CPU 透過此路徑進行 **取指 (Fetch)**
-  - **資料匯流排 (D-Bus)** ： 物理線路直接連接至 SRA，CPU 透過此路徑進行變數的 **讀取與寫入 (LDR 從記憶體讀進暫存 / STR 從暫存器寫進記憶體)**
+- 多數 STM32 (ARM Cortex-M 晶片) 採用改良型哈佛架構，其核心特徵在於物理路徑 **完全獨立**，**程式碼** 和 **資料** 分開走
+  - **指令匯流排 (I-Bus)** ： 物理線路直接連接至 Internal Flash，CPU 透過此路徑進行 **取指 (Fetch)**，Flash 定義為 (rx) 為單向
+  - **資料匯流排 (D-Bus)** ： 物理線路直接連接至 SRAM，CPU 透過此路徑進行變數的 **讀取與寫入 (LDR 從記憶體讀進暫存 / STR 從暫存器寫進記憶體)**
 - **零爭用 (Zero Contention)**
   - 讓 CPU 能夠在 **左手拿指令** 的同時， **右手拿資料**，在硬體電路上互不干擾，實現 **真正的平行處理**
 #### STM32 vs. 現代 PC (x86)
 PC 也有 I-Cache 跟 D-Cache，不也是分開的嗎？
 |比較維度|STM32 (純哈佛架構)|現代 PC / x86 (馮紐曼架構)|
 |:---|:---|:---|
-|外部物理路徑|分開，擁有獨立的 Flash 與 RAM 匯流排|統一，指令與資料共用**一條主記憶體匯流排**|
+|外部物理路徑|分開，擁有獨立的 Flash 與 RAM 匯流排|統一，指令與資料共用**一條主記憶體匯流排**(程式碼和資料混在一起)|
 |平行處理手段|硬體隔離，先天具備兩條水管|邏輯分流，依靠 **分裂式 L1 Cache (I-Cache / D-Cache)**|
 |執行確定性|極高，每次**存取時間固定**，無抖動|具隨機性，效能高度依賴 **快取命中率 (Cache Hit Rate)**|
 |適用場景|追求精確時序的 **SSD 韌體控制器**|追求**極致吞吐量的通用運算**
@@ -148,15 +148,16 @@ PC 也有 I-Cache 跟 D-Cache，不也是分開的嗎？
 
 #### 記憶體映射與位址解碼 (Address Decoding)
 CPU 只認得 位址 (Address)，硬體設計者要透過位址解碼電路，將不同的物理晶片掛載到特定位址
-- **0x0800 0000 區間** ： 連接至 FLASH 晶片 (預設 `rx`)
+- **0x0800 0000 區間** ： 硬體設計者解碼（Decode）連接至 FLASH 晶片 (預設 `rx`)
 - **0x2000 0000 區間** ： 連接至 SRAM 晶片 (預設 `rwx`)
 ```
+* 在 .ld 裡定義權限中沒有 w 
 當 CPU 執行 STR 指令試圖寫入 0x0800 0000 時，Flash 控制器會因為硬體電路限制直接拒絕
 這在架構上確保了「 程式碼段 (.text) 」不會被意外的指標錯誤 (Pointer Bug) 所篡改
 ```
 #### 系統安全防護：MPU (Memory Protection Unit)
 在 STM32 中，可以進一步啟用 MPU 來強化 Linker Script 的屬性，使在 **Bare-metal** 環境下也能實現如 **OS 級別的記憶體隔離保護**
 - STM32 異常捕獲 ： 若發生非法寫入，MPU 會觸發 **Memory Management Fault**，
-- 對標 Linux ： 在 Linux 系統中對應為著名的 **Segmentation Fault**
+- 對標 Linux ： 在 Linux 系統的 MMU 中對應為著名的 **Segmentation Fault**
 
 
