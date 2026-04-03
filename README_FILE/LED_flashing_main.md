@@ -35,3 +35,10 @@ int main(void) {
     return 0;
 }
 ```
+## 一、程式碼實作
+- #### Read-Modify-Write (RMW) 操作
+  - 能同時控制多個外設（如 GPIOA, DMA）， `|=` 能確保只置位第 19 位而不干擾其他配置，直接賦值（=）會意外關閉其他已開啟的時鐘
+  - `GPIOC_ODR ^= (1 << 6)`，使用位元運算子（Bitwise Operators）能精確操作特定腳位，避免覆蓋掉該 Port 其他 15 個腳位的狀態
+- #### `delay()` 函式內部的 `__asm("nop")`
+  - NOP (No Operation) 叫 CPU 原地踏步一個週期
+  - 若沒有這行，編譯器可能會發現 `while(count--)` 什麼都沒做，進而將整個迴圈優化刪除，導致延遲失效
