@@ -57,7 +57,7 @@ SECTIONS
     |`a`|Allocatable|可分配空間|
     
 - **段落(SECTIONS)**
-  - **Regoin 結構名稱** : **.text**、 **.data**、 **.bss**，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
+  - **Regoin 結構名稱** : **.text**  **.data**  **.bss**，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
     - `.text` :  在 FLASH 裡規劃一個 **.text-region**
       - 在所有編譯好的檔案中找到標籤為 `.isr_vector` 的檔案，放到 FLASH 最前面，且不准刪掉
         - `.isr_vector` 會在 `startup.c` 中定義的段落名稱，專門放 **中斷向量（Reset, NMI, HardFault 等位址）**
@@ -96,9 +96,12 @@ SECTIONS
   - 燒錄器會下達 **特殊的硬體命令**（**FLASH Controller**）來 **解鎖 FLASH** 並寫入資料，這時不受 Linker Script 的權限屬性限制
 - 啟動階段 (Move Process)
   - 按下 Reset 後，CPU 執行 `startup.c` 中的 `Reset_Handler()`
-  - 根據 Linker Script 提供的符號（`_sidata`, `_sdata`, `_edata`），將變數初始值從 FLASH 搬移到 RAM
+  - 根據 Linker Script 提供的符號（`_sidata`, `_sdata`, `_edata`），跑 while 迴圈，將變數初始值從 FLASH 搬移到 RAM
+  - 順便把 **.bss** 段，在 RAM 裡全部填 0
 - 執行階段 (Execution)
-  - 進入 main() 後，CPU 直接存取 RAM 中的變數
+  - 搬家完成後，`Reset_Handler()` 才會呼叫 `main()`
+  - 進入 `main()` (**Code in RAM**) 後，CPU 直接存取 RAM 中的變數
+  - 程式碼執行時，此刻 FLASH 對 CPU 來說就是 **唯讀**，即使修改變數，FLASH 裡的原始值也不會變
   - RAM 的存取速度遠高於 FLASH
 #### 為何 SSD 韌體關鍵程式碼要跑在 RAM？
 - FLASH 必須先 **擦除** 才能 **寫入**，且讀取速度較慢
@@ -108,7 +111,7 @@ SECTIONS
 ```
 arm-none-eabi-objdump -h build/main.o
 ```
-- 顯示 **.text** , **.data** , **.bss** 各自佔用的空間
+- 顯示 **.text**  **.data**  **.bss** 各自佔用的空間
 - `-h` 代表查看 Header（標頭）
 
 
