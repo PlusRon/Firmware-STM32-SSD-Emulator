@@ -67,7 +67,7 @@ uint32_t vector_table[] = {
 };
 
 ```
-## 中斷向量表 (Vector Table)
+## 一、中斷向量表 (Vector Table)
 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 Flash 起始處的兩個數值
 - **MSP (Main Stack Pointer)** ： 定義堆疊的起點（通常位於 RAM 頂端）
 - **Reset Vector** ： 開機後第一條指令的入口地址
@@ -78,7 +78,7 @@ uint32_t vector_table[] = {
     (uint32_t)Reset_Handler                // 1. Reset 向量：CPU 開機後的跳轉起點
 };
 ```
-## 實作 Reset_Handler ： 資料搬家與環境初始化
+## 二、實作 Reset_Handler ： 資料搬家與環境初始化
 是韌體執行的起點，負責將 Linker Script 中規劃的 **虛擬地圖** 轉化為 **物理地址**
 - 搬移 **.data** 段 (LMA to VMA)
   - 將具有初始值的全域變數 從 Flash (唯讀倉庫) 複製到 RAM (工作區)
@@ -107,7 +107,7 @@ void Reset_Handler(void) {
     while (1);
 }
 ```
-## 防禦性編程 (Defensive Programming) : 自動恢復與軟體重置 (進階韌體)
+## 三、防禦性編程 (Defensive Programming) : 自動恢復與軟體重置 (進階韌體)
 在 SSD 韌體開發中，**資料可用性 (Data Availability)** 至關重要。若程式邏輯發生**異常意外從 `main()` 退出**，必須追求 **即時恢復 (Instant Recovery)**，而非空轉 `while(1)` 等待 看門狗(Watchdog)
 - **軟體觸發重置 (AIRCR 操作)**
   - 接操作 ARM Cortex-M 內核的 **系統控制區 (SCS)**
