@@ -76,7 +76,9 @@ clean:
 - #### 時間戳記檢查 (Timestamp Checking)
   - **增量編譯 (Incremental Build)** ： Make 會比對 main.c 與 main.o 的修改時間
   - 如果 **依賴檔 `.c`** 的更新時間新於 **目標檔 `.o`**，代表修改過程式碼，需針對該檔重新編譯
-  - 依賴項比目標新，顯示 up to date，可跳過該編譯步驟，可大幅縮短開發迴圈時間
+  - 依賴項比目標新，顯示 up to date，可跳過該編譯步驟，可大幅縮短開發迴圈時間(Iteration Time)
+- #### 編譯參數與連結腳本統一管理
+  - 確保了團隊開發環境的 **一致性 (Consistency)** 與 **可重複性 (Reproducibility)**
 - #### 標準語法格式
   - **目標** ： 想產出的 **檔案(project.elf)** 或一個 **任務名稱(clean)**
   - **依賴項** ： 要完成這個目標，必須先存在的東西，**子函式**的概念
@@ -86,7 +88,7 @@ clean:
       [Tab鍵] Shell 指令1
       [Tab鍵] Shell 指令2
       ```
-  - **變數定義 (Variables)** : 別把路徑或工具名稱 **寫死(Hard-code)**，使用變數方便日後更換工具鏈
+  - **變數定義 (Variables)** : 別把路徑或工具名稱 **寫死(Hard-code)**，使用變數方便日後更換 **clang** 或不同版本的工具鏈
     ```
     CC      = arm-none-eabi-gcc
     OBJCOPY = arm-none-eabi-objcopy
@@ -104,28 +106,30 @@ clean:
     ```
     all: $(BUILD_DIR)/project.bin
     ```
-  - **虛擬目標 (Phony Targets)** : 不是為了產生檔案，而是為了 **執行動作(如燒錄、清理)**
-    - 為了避免目錄下剛好有個檔案叫 clean 而導致衝突，通常會宣告 .PHONY
-      ```
-      # 5. 宣告偽目標
-      .PHONY: all clean flash erase
+  - **虛擬目標 (Phony Targets)** : 不產出檔案的純指令，為了 **執行動作(如燒錄、清理)**，為了避免目錄下剛好有個檔案叫 clean 而導致衝突，通常會宣告 `.PHONY`
+    ```
+    # 5. 宣告偽目標
+    .PHONY: all clean flash erase
 
-      # 步驟 D: OpenOCD 一鍵燒錄 (驗證 + 重啟)、擦除、清理指令
-      flash: $(BUILD_DIR)/project.bin
-          $(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET) \
-          -c "program $< verify reset exit 0x08000000"
+    # 步驟 D: OpenOCD 一鍵燒錄 (驗證 + 重啟)、擦除、清理指令
+    flash: $(BUILD_DIR)/project.bin
+        $(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET) \
+        -c "program $< verify reset exit 0x08000000"
         
-      erase:
-          $(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET) \
-          -c "init; halt; stm32f0x mass_erase 0; exit"
+    erase:
+        $(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET) \
+        -c "init; halt; stm32f0x mass_erase 0; exit"
         
-      clean:
-          rm -rf $(BUILD_DIR)
-      ```
+    clean:
+        rm -rf $(BUILD_DIR)
+    ```
 ## 二、關鍵函數與參數解析
 - #### 自動化函數
   - **wildcard** (搜集員)
     - `SRCS = $(wildcard app/*.c)` 會掃描硬碟，找出所有**真實存在的原始碼**
+    - `$` ： 代表呼叫 Makefile 的函數
+    - `wildcard` ： 函數的名稱
+    - `app/*.c` ： 搜尋模式，`*` 萬用符號，代表 任何字元。找出 `app/` 資料夾下，所有 `.c` 結尾的檔案
   - **patsubst** (計畫員)
     - `OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRCS))` 在記憶體中預先畫好一張 待產清單，**定義未來 `.o` 的存放位置**
 - #### 連結器的斷捨離
