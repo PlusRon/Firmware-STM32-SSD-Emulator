@@ -63,8 +63,11 @@ typedef struct {
     - **`#define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)`**
     - 可以透過 **`RCC->AHBENR`** 的方式操作暫存器的內容
 - #### 非 struct 結構 定義 Peripheral Resgister 記憶體映射 I/O (MMIO)
+  ```
+  #define RCC_AHBENR   (*(volatile uint32_t*)(0x40021014))
+  ```
   - **`volatile`** : 韌體開發的核心，強制 CPU 每次都要執行 **LDR/STR 指令讀取實體記憶體** 的值，防止編譯器優化（因為硬體狀態 像是按鈕輸入是會隨時改變的）
-  - **`(volatile unsigned int*)`** : 告訴編譯器這是一個指向 **32-bit 硬體空間的指標**
+  - **`(volatile uint32_t*)`** : 告訴編譯器這是一個指向 **32-bit 硬體空間的指標**
   - **`*`** : **解引用 (Dereference)**，代表要 **操作該地址裡的內容**
 
 ### 解構基底與偏移 (Base & Offset)
