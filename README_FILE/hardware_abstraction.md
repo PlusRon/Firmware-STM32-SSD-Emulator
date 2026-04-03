@@ -60,15 +60,16 @@ typedef struct {
 - GPIOC 位於 AHB2 的偏移處，基位址變為 **0x48000800**
 #### **暫存器偏移量 (Register Offset)**：
 - **RCC (周邊基底)** 內部 : 不同的功能之暫存器有各自的偏移，例如 AHBENR (AHB Peripheral Clock Enable Register) 的偏移為 **0x14**
-  - $Address_{AHBENR} = Base_{RCC} + Offset_{AHBENR} = 0x4002 1000 + 0x14 = 0x40021014$
+  - **計算公式** : $Address_{AHBENR} = Base_{RCC} + Offset_{AHBENR} = 0x4002 1000 + 0x14 = 0x40021014$
+    -  $Offset_{AHBENR}$ 以C 語言 **struct 成員連續配置** 的特性，實作出偏移
     - **RCC->AHBENR** 的最終地址: **0x40021014**
     - 當對該地址的 **第 19 位元 (IOPCEN, I/O Peripheral Clock Enable)** 寫入 1 時，硬體電路會把時鐘訊號送到 GPIOC，該周邊才能開始工作
     - **低功耗設計（Low Power Design）** : 數位電路中，電晶體翻轉在訊號 0 和 1 切換時最耗電，若時鐘訊號一直跑，即便沒用該腳位，內部百萬電晶體仍會持續翻轉並浪費電力，透過 **RCC（Reset and Clock Control）**，可以只開啟目前需要的硬體模組，省電
     - 周邊設備（GPIO, UART, SPI…）初始狀態下，其內部的 **時鐘訊號線（Clock Line）都是斷開的**
       - Bit 17: IOPAEN (GPIOA Enable)
-        - Bit 18: IOPBEN (GPIOB Enable)
-        - Bit 19: IOPCEN (GPIOC Enable)
-        - `RCC_AHBENR |= (1 << 19);` 的二進位的變化如下
+      - Bit 18: IOPBEN (GPIOB Enable)
+      - Bit 19: IOPCEN (GPIOC Enable)
+      - `RCC_AHBENR |= (1 << 19);` 的二進位的變化如下
           ```
           RCC_AHBENR 原值 : 0000 0000 0000 0000 0000 0000 0000 0000
              (1 << 19)    : 0000 0000 0000 1000 0000 0000 0000 0000
@@ -76,12 +77,11 @@ typedef struct {
              OR 運算後結果 : 0000 0000 0000 1000 0000 0000 0000 0000
                                            ^ 第 19 位變成 1
           ```
-        - 處理 **共用控制暫存器** 的標準做法，利用 **Read-Modify-Write (RMW)** 操作 (**|=、&=、^|**)，確保只針對第 19 位元進行 Set，不干擾暫存器中其他的配置狀態
+      - 處理 **共用控制暫存器** 的標準做法，利用 **Read-Modify-Write (RMW)** 操作 (**|=、&=、^|**)，確保只針對第 19 位元進行 Set，不干擾暫存器中其他的配置狀態
         - RCC_AHBENR 暫存器中同時控制了多個關鍵外設（如 GPIOA, GPIOB, DMA 等）。如果直接使用 **= 賦值** 會意外地將其他已經開啟的外設時鐘全部關閉
-  - **GPIOC (周邊基底)** 內部 : 不同的功能之暫存器有各自的偏移，例如 ODR (Output Data Register) 的偏移為 **0x14**
+- **GPIOC (周邊基底)** 內部 : 不同的功能之暫存器有各自的偏移，例如 ODR (Output Data Register) 的偏移為 **0x14**
+  - **計算公式** : $Address_{ODR} = Base_{GPIOC} + Offset_{ODR} = 0x4800 0800 + 0x14 = 0x48000814$
 
-- 計算公式: $Address_{ODR} = Base_{GPIOC} + Offset_{ODR} = 0x48000800 + 0x14 = 0x48000814$
-  - 其中的 $Offset_{ODR}$ 以C 語言 **struct 成員連續配置** 的特性，實作出偏移
  
 
 
