@@ -10,7 +10,7 @@ Firmware-STM32-SSD-Emulator
 根據 STM32F072 的 **[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)**，找出晶片的實體記憶體佈局
 - FLASH (唯讀儲存) : 起始於 `0x08000000`，容量 **128 KB**
 - SRAM (執行與存取) : 起始於 `0x20000000`，容量 **16 KB**
-<img width="1009" height="447" alt="image" src="https://github.com/user-attachments/assets/2ca2ff23-cefb-4a80-9369-6bccc6a4b9c1" />
+  <img width="1009" height="447" alt="image" src="https://github.com/user-attachments/assets/2ca2ff23-cefb-4a80-9369-6bccc6a4b9c1" />
 
 #### 撰寫 Linker Script 腳本
 告訴連結器（Linker）如何將編譯好的目標檔案（.o）組合，並擺放到正確的記憶體位址
