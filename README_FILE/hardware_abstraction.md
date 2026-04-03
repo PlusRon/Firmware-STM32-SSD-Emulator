@@ -23,7 +23,7 @@ typedef struct {
     volatile uint32_t AFRH;     /* 0x24: Function reuse High-bit */
 } GPIO_TypeDef;
 
-/* RCC 暫存器結構體 (Reset and Clock Control) */
+/* RCC Register Structures (Reset and Clock Control) */
 typedef struct {
     volatile uint32_t CR;        /* 0x00: Clock Control */
     volatile uint32_t CFGR;      /* 0x04: Clock Configuration */
