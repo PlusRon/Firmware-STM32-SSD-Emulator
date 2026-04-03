@@ -50,15 +50,32 @@ typedef struct {
 ```
 ## 一、程式碼實作
 利用 C 語言 結構體成員 **連續配置** 的特性，實現了 **隱形偏移量 (Implicit Offset)**
+### 語法結構解析
+- #### struct 結構 定義 Peripheral Resgister 記憶體映射 I/O (MMIO)
+  - 建立 Peripheral 的 struct
+  - 結構成員配置為該周邊的所有暫存器，照位址 offset 向下排列，因 struct 為連續配置產生隱形 offset
+    - 每個暫存器修飾為 `volatile` 防止編譯器優化，強制 CPU 每次都要執行 **LDR/STR 指令讀取實體記憶體** 的值
+  - 定義 Peripheral 的基底位址
+    - **`#define RCC_BASE    (0x40021000UL)`**
+    - **`#define RCC_BASE    (0x40021000UL)`**
+  - 定義 Peripheral 的結構指標 並 賦值 為 對應的基底位址
+    - **`#define RCC         ((RCC_TypeDef *)  RCC_BASE)`**
+    - **`#define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)`**
+    - 可以透過 **`RCC->AHBENR`** 的方式操作暫存器的內容
+- #### 非 struct 結構 定義 Peripheral Resgister 記憶體映射 I/O (MMIO)
+  - **`volatile`** : 韌體開發的核心，強制 CPU 每次都要執行 **LDR/STR 指令讀取實體記憶體** 的值，防止編譯器優化（因為硬體狀態 像是按鈕輸入是會隨時改變的）
+  - **`(volatile unsigned int*)`** : 告訴編譯器這是一個指向 **32-bit 硬體空間的指標**
+  - **`*`** : **解引用 (Dereference)**，代表要 **操作該地址裡的內容**
+
 ### 解構基底與偏移 (Base & Offset)
 在 STM32 中，周邊設備存取都是透過 **記憶體映射 I/O (MMIO)** 實現，採分層管理架構 (STM32F072 參考手冊)
-#### **總線基位址 (Bus Base Address)**：
+#### 1. 總線基位址 (Bus Base Address)：
 - AHB1 總線的起始位址為 **0x4002 0000**，其中 RCC 掛載於此 BUS
 - AHB2 總線的起始位址為 **0x48000000**，其中 GPIO 掛載於此 BUS
-#### **周邊偏移量 (Peripheral Offset)**：
+#### 2. 周邊偏移量 (Peripheral Offset)：
 - RCC 位於 AHB2 的偏移處，基位址變為 **0x4002 1000**
 - GPIOC 位於 AHB2 的偏移處，基位址變為 **0x48000800**
-#### **暫存器偏移量 (Register Offset)**：
+#### 3.暫存器偏移量 (Register Offset)：
 - **RCC (周邊基底)** 內部 : 不同的功能之暫存器有各自的偏移，例如 AHBENR (AHB Peripheral Clock Enable Register) 的偏移為 **0x14**
   - **計算公式** : $Address_{AHBENR} = Base_{RCC} + Offset_{AHBENR} = 0x4002 1000 + 0x14 = 0x40021014$
     -  $Offset_{AHBENR}$ 以C 語言 **struct 成員連續配置** 的特性，實作出偏移
