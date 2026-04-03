@@ -6,13 +6,13 @@ Firmware-STM32-SSD-Emulator
 - #### [Linux to STM32 開發環境建置](README_FILE/environment_setup.md)
 
 ## 硬體 (STM32) 啟動流程 (Boot Startup Procedure)
-#### 查閱硬體邊界 (Memory Mapping)
+### 查閱硬體邊界 (Memory Mapping)
 根據 STM32F072 的 **[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)**，找出晶片的實體記憶體佈局
 - FLASH (唯讀儲存) : 起始於 `0x08000000`，容量 **128 KB**
 - SRAM (執行與存取) : 起始於 `0x20000000`，容量 **16 KB**
   <img width="1009" height="447" alt="image" src="https://github.com/user-attachments/assets/2ca2ff23-cefb-4a80-9369-6bccc6a4b9c1" />
 
-#### 撰寫 Linker Script 腳本
+### 撰寫 Linker Script 腳本
 告訴連結器（Linker）如何將編譯好的目標檔案（.o）組合，並擺放到正確的記憶體位址
 - `.ld` 是 Linker Script（連結器腳本）
   - 使用 **GNU Linker Command Language**（GNU 連結器命令語言） 
@@ -31,14 +31,14 @@ Firmware-STM32-SSD-Emulator
   - **MEMORY** 程式碼區塊
   - **SECTIONS** 程式碼區塊
 
-#### 撰寫開機導引 (Boot Startup)
+### 撰寫開機導引 (Boot Startup)
 STM32 通電（Power-on）或按下 Reset 鍵的那一刻，CPU 並不具備執行 C 語言環境的能力，必須撰寫 `startup.c` 來手動配置硬體環境，並引導系統進入 `main()`
 - #### [startup.c 實作](README_FILE/startup.md)
   - **中斷向量表 (Vector Table)** : 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 FLASH 起始處
   - **`Reset_Handler()` 程式**： 資料搬家 與 環境初始化
   - **控制 SCB (System Control Block) 的 SYSRESETREQ** : 使異常時能自動恢復與軟體重置
 
-#### 主程式碼實作 (Implementation)
+### 主程式碼實作 (Implementation)
 - #### 硬體抽象層 (include/)
   - #### [底層暫存器定義 stm32f072xb.h](README_FILE/hardware_abstraction.md)
 - #### 應用邏輯層 (src/)
