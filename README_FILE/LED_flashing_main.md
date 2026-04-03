@@ -36,6 +36,7 @@ int main(void) {
 }
 ```
 ## 一、ODR (Output Data Register) 的 讀取-修改-寫入 (Read-Modify-Write, RMW)
+在中斷頻繁時可能產生 **Race Condition**
 - #### Read-Modify-Write (RMW) 操作
   - 能同時控制多個外設（如 GPIOA, DMA）， `|=` 能確保只置位第 19 位而不干擾其他配置，直接賦值（=）會意外關閉其他已開啟的時鐘
   - `GPIOC_ODR ^= (1 << 6)`，使用位元運算子（Bitwise Operators）能精確操作特定腳位，避免覆蓋掉該 Port 其他 15 個腳位的狀態
