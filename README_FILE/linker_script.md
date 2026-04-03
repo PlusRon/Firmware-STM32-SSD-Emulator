@@ -57,16 +57,20 @@ SECTIONS
     |`a`|Allocatable|可分配空間|
     
 - **段落(SECTIONS)**
-  - Regoin 結構名稱 : `.text`, `.data`, `.bss`，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
+  - **Regoin 結構名稱** : `.text`, `.data`, `.bss`，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
     - `.text` :  在 FLASH 裡規劃一個 .text-region
       - 在所有編譯好的檔案中找到標籤為 `.isr_vector` 的檔案，放到 FLASH 最前面，且不准刪掉
         - `.isr_vector` 會在 `startup.c` 中定義的段落名稱，專門放 **中斷向量（Reset, NMI, HardFault 等位址）**
         - `KEEP(...)` : 因為連結器有 Garbage Collection 功能。如果連結器發現 `main()` 沒用到某個函式，為了省空間會把它刪掉
-      - 將標籤開頭是 `.text` 的機器碼(`.o`)排在向量表後面
-  - 符號 (Symbols) : Region 中的變數名
+      - `*(.text*)`將標籤開頭是 `.text` 的機器碼(`.o`)排在向量表後面
+        - 第一個 `*`（檔案過濾器）: 所有的輸入檔案(.o)
+        - `.text*` : 不管是 `.text` 還是 `.text.什麼什麼`，全部一網打盡
+      - `*(.rodata*)` : 常數
+      - `. = ALIGN(4);` : 將存放 程式碼的 .text-region 起始處 與 結束處 對齊 4 的倍數 (FLASH 對齊)，以提高效率
+  - **符號 (Symbols)** : Region 中的變數名
     - `_stext`, `_etext`, `_sdata`, `_edata`, `_estack` （可自訂）
     - 提供給 `startup.c` 使用的 地址變數名
-  - COMMON 段落 : 撰寫 `int x;` 卻沒給初值，它一定會進 .bss 嗎?
+  - **COMMON 段落** : 撰寫 `int x;` 卻沒給初值，它一定會進 .bss 嗎?
     - 某些 GCC 配置下，**未初始化的全域變數** 會先被放在一個叫 COMMON 的暫時段落
     - 最後 Linker 進行連結時，才會根據 Linker Script 的指示，把 COMMON 併入 .bss 段落中
     - 所以在 Linker Script 的 .bss 結構裡通常會寫 `*(COMMON)`
