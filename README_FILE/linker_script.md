@@ -57,8 +57,13 @@ SECTIONS
     |`a`|Allocatable|可分配空間|
     
 - **段落(SECTIONS)**
-  - 結構名稱 : `.text`, `.data`, `.bss`，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
-  - 符號 (Symbols) 
+  - Regoin 結構名稱 : `.text`, `.data`, `.bss`，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
+    - `.text` :  在 FLASH 裡規劃一個 .text-region
+      - 在所有編譯好的檔案中找到標籤為 `.isr_vector` 的檔案，放到 FLASH 最前面，且不准刪掉
+        - `.isr_vector` 會在 `startup.c` 中定義的段落名稱，專門放 **中斷向量（Reset, NMI, HardFault 等位址）**
+        - `KEEP(...)` : 因為連結器有 Garbage Collection 功能。如果連結器發現 `main()` 沒用到某個函式，為了省空間會把它刪掉
+      - 將標籤開頭是 `.text` 的機器碼(`.o`)排在向量表後面
+  - 符號 (Symbols) : Region 中的變數名
     - `_stext`, `_etext`, `_sdata`, `_edata`, `_estack` （可自訂）
     - 提供給 `startup.c` 使用的 地址變數名
   - COMMON 段落 : 撰寫 `int x;` 卻沒給初值，它一定會進 .bss 嗎?
