@@ -86,6 +86,24 @@ clean:
       [Tab鍵] Shell 指令1
       [Tab鍵] Shell 指令2
       ```
+  - **變數定義 (Variables)** : 別把路徑或工具名稱 **寫死(Hard-code)**，使用變數方便日後更換工具鏈
+    ```
+    CC      = arm-none-eabi-gcc
+    OBJCOPY = arm-none-eabi-objcopy
+    OPENOCD = openocd
+
+    BUILD_DIR = build
+    LINKER_SCRIPT = linker/stm32.ld
+
+    OCD_INTERFACE = interface/stlink.cfg
+    OCD_TARGET    = target/stm32f0x.cfg
+    
+    CFLAGS  = -mcpu=cortex-m0 -mthumb -Iinclude -g -O0 -Wall -ffunction-sections -fdata-sections
+    ```
+  - **預設目標 (Default Target)** : 放在最上面，**不加參數直接輸入 make** 時，會跑 **第一個看到的目標**
+    ```
+    all: $(BUILD_DIR)/project.bin
+    ```
 ## 二、關鍵函數與參數解析
 - #### 自動化函數
   - **wildcard** (搜集員)
