@@ -127,25 +127,26 @@ void system_soft_reset(void) {
     - 主動呼叫 **`system_soft_reset()`** 能將 **系統斷線時間 (Downtime)** 縮減至 **微秒** 等級
 
 ## 四、系統控制區 SCB (System Control Block)
-#### 查閱 [Cortex-M0 Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)
-- #### 計算出 AIRCR 暫存器位址
-  - ARM 將 **系統控制相關的暫存器** 集中在 **SCB (System Control Block)** 區域
-  - SCB 的基底位址 (**Base Address**) 是 **0xE000 ED00**
-    <img width="769" height="71" alt="image" src="https://github.com/user-attachments/assets/5f4dcfcf-4bee-49e0-a905-579dc841cae8"/>
-  - **AIRCR (Application Interrupt and Reset Control Register)** 的 **偏移量 (Offset)** 是 **0x0C**
-    <img width="1303" height="981" alt="image" src="https://github.com/user-attachments/assets/5d9c7f76-c93c-4414-a040-5d5e6c6d52ab" />
-  - 計算結果 **AIRCR 暫存器位址** ： 0xE000 ED00 + 0x0C = **0xE000ED0C**
+#### 查閱 Programming Manual
+- #### [Cortex-M0 Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)
+#### 計算出 AIRCR 暫存器位址
+- ARM 將 **系統控制相關的暫存器** 集中在 **SCB (System Control Block)** 區域
+- SCB 的基底位址 (**Base Address**) 是 **0xE000 ED00**
+  <img width="769" height="71" alt="image" src="https://github.com/user-attachments/assets/5f4dcfcf-4bee-49e0-a905-579dc841cae8"/>
+- **AIRCR (Application Interrupt and Reset Control Register)** 的 **偏移量 (Offset)** 是 **0x0C**
+  <img width="1303" height="981" alt="image" src="https://github.com/user-attachments/assets/5d9c7f76-c93c-4414-a040-5d5e6c6d52ab" />
+- 計算結果 **AIRCR 暫存器位址** ： 0xE000 ED00 + 0x0C = **0xE000ED0C**
 
-- #### 寫入 0x05FA 密碼鑰匙 (VECTKEY)
-  - 韌體開發中的 **保護機制 (Unlock Sequence)、鑰匙機制 (Key Mechanism)**
-  - 將 AIRCR 暫存器的高 **16 位元（[31:16]）** 被設計為 VECTKEY，才能執行系統重啟
+#### 寫入 0x05FA 密碼鑰匙 (VECTKEY)
+- 韌體開發中的 **保護機制 (Unlock Sequence)、鑰匙機制 (Key Mechanism)**
+- 將 AIRCR 暫存器的高 **16 位元（[31:16]）** 被設計為 VECTKEY，才能執行系統重啟
     - 若你寫入系統暫存器時，高 16 位元不等於 **`0x05FA`**，硬體會直接忽略這次寫入請求
     - 重置（Reset）是極危險的操作，若沒有 VECTKEY，任何錯誤的指標操作（Pointer Bug）意外掃到這個位址，都可能導致 SSD 頻繁重啟，造成資料毀損
       <img width="1302" height="992" alt="image" src="https://github.com/user-attachments/assets/39083b79-be3a-41be-b4c6-f0b22f26ba16" />
-- #### 設定第 2 位元 SYSRESETREQ 觸發 System Reset Request (系統層級重置請求)
-  - 當此位元被設定為 `1` 時，Cortex-M Kernel 會向 **外部重置控制器** 發出訊號，強制晶片除了 Debug 模組 以外的所有部分執行重置
-  - 熱啟動 (Warm Reset) : 會 重新載入中斷向量表，並重新執行 Reset_Handler()
-  - 當韌體偵測到不可恢復的邏輯錯誤（如 FTL 表損壞且無法透過 ECC 修復），最安全的做法就是 **立刻啟動 SYSRESETREQ**，能確保所有硬體狀態（SRAM, DMA, Flash Controller）回到初始狀態，避免錯誤擴散
+#### 設定第 2 位元 SYSRESETREQ 觸發 System Reset Request (系統層級重置請求)
+- 當此位元被設定為 `1` 時，Cortex-M Kernel 會向 **外部重置控制器** 發出訊號，強制晶片除了 Debug 模組 以外的所有部分執行重置
+- 熱啟動 (Warm Reset) : 會 重新載入中斷向量表，並重新執行 Reset_Handler()
+- 當韌體偵測到不可恢復的邏輯錯誤（如 FTL 表損壞且無法透過 ECC 修復），最安全的做法就是 **立刻啟動 SYSRESETREQ**，能確保所有硬體狀態（SRAM, DMA, Flash Controller）回到初始狀態，避免錯誤擴散
     <img width="1126" height="354" alt="image" src="https://github.com/user-attachments/assets/ca2f5d1e-dbb9-4435-be49-c6ea4e9682d6" />
 
 
