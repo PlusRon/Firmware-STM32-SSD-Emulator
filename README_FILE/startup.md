@@ -62,9 +62,70 @@ void Reset_Handler(void) {
 /* Use the attribute ensure the data is placed in the .isr_vector-region that specified by Linker Script */
 __attribute__ ((section(".isr_vector")))
 uint32_t vector_table[] = {
-    0x20004000,               // 0. initial Stack Point(MSP) : top of RAM (0x20000000 + 16KB)
+    0x20004000,               // 0. initial Main Stack Point(MSP) : top of RAM (0x20000000 + 16KB)
     (uint32_t)Reset_Handler   // 1. Reset Vector : CPU first jump to this location after power-on
 };
 
 ```
-## 
+## 中斷向量表 (Vector Table)
+根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 Flash 起始處的兩個數值
+- **MSP (Main Stack Pointer)** ： 定義堆疊的起點（通常位於 RAM 頂端）
+- **Reset Vector** ： 開機後第一條指令的入口地址
+```
+__attribute__ ((section(".isr_vector")))   // 確保下方表格精確擺放在 Linker Script 指定的 .isr_vector 區段
+uint32_t vector_table[] = {
+    0x20004000,                            // 0. 初始堆疊指標 (MSP): RAM 頂端 (16KB)
+    (uint32_t)Reset_Handler                // 1. Reset 向量：CPU 開機後的跳轉起點
+};
+```
+## 實作 Reset_Handler ： 資料搬家與環境初始化
+是韌體執行的起點，負責將 Linker Script 中規劃的 **虛擬地圖** 轉化為 **物理地址**
+- 搬移 **.data** 段 (LMA to VMA)
+  - 將具有初始值的全域變數 從 Flash (唯讀倉庫) 複製到 RAM (工作區)
+- 初始化 **.bss** 段
+  - 將未初始化的全域變數 **清零**，確保 **C 語言** 規範中的 **變數預設值為 0**
+```
+void Reset_Handler(void) {
+    // 1. 複製 .data：從 Flash (&_etext) 到 RAM (&_sdata)
+    uint32_t *src = &_etext;
+    uint32_t *dest = &_sdata;
+    while (dest < &_edata) {
+        *dest++ = *src++;
+    }
+
+    // 2. 清零 .bss：初始化 RAM 空間
+    dest = &_sbss;
+    while (dest < &_ebss) {
+        *dest++ = 0;
+    }
+
+    // 3. 環境就緒，進入主程式
+    main();
+
+    // 4. 保護機制：若 main 意外退出
+    system_soft_reset(); 
+    while (1);
+}
+```
+## 防禦性編程 (Defensive Programming) : 自動恢復與軟體重置 (進階韌體)
+在 SSD 韌體開發中，**資料可用性 (Data Availability)** 至關重要。若程式邏輯發生**異常意外從 `main()` 退出**，必須追求 **即時恢復 (Instant Recovery)**，而非空轉 `while(1)` 等待 看門狗(Watchdog)
+- **軟體觸發重置 (AIRCR 操作)**
+  - 接操作 ARM Cortex-M 內核的 **系統控制區 (SCS)**
+  - 寫入 **AIRCR 暫存器** 要求晶片立即重啟
+```
+void system_soft_reset(void) {
+    // AIRCR 暫存器位址: 0xE000ED0C
+    uint32_t *aircr = (uint32_t *)0xE000ED0C;
+    // 寫入 0x05FA 密碼鑰匙 (VECTKEY) 並設定第 2 位元 (SYSRESETREQ)
+    *aircr = (0x05FA << 16) | (1 << 2);
+    while(1);
+}
+```
+- 為何不能只靠看門狗 (Watchdog)?
+  - **重置延遲 (Reset Latency)** ： 若系統發生邏輯崩潰，原地踏步等看門狗咬人等待時間會太長
+    - **Watchdog** 通常設定為數百 **毫秒** 的週期
+    - 主動呼叫 **`system_soft_reset()`** 能將 **系統斷線時間 (Downtime)** 縮減至 **微秒** 等級
+
+
+
+
