@@ -126,7 +126,7 @@ void system_soft_reset(void) {
     - **Watchdog** 通常設定為數百 **毫秒** 的週期
     - 主動呼叫 **`system_soft_reset()`** 能將 **系統斷線時間 (Downtime)** 縮減至 **微秒** 等級
 
-### 系統控制區 SCB (System Control Block)
+## 四、系統控制區 SCB (System Control Block)
 #### 查閱 [Cortex-M0 Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)
 - #### 計算出 AIRCR 暫存器位址
   - ARM 將 **系統控制相關的暫存器** 集中在 **SCB (System Control Block)** 區域
