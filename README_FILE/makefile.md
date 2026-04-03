@@ -145,12 +145,22 @@ clean:
 - #### 參數解析
   - **`$@`** : 為 **自動變數**，代表 **目標名稱**
   - **`$<`** : 為 **自動變數**，代表 **第一個依賴項**
+  - **`-c`**  : 給 **GCC(`arm-none-eabi-gcc`)** 看的，只將 `.c` 原始碼 編譯成 **機器碼 `.o` 目標檔 (Object file)**，先不要連結
 - #### 硬體操作指令
   - **`flash: $(BUILD_DIR)/project.bin`** : 當輸入 `make flash` 時 `make` 會先去檢查 `.bin` 是否為最新，若不是（你改了程式），會自動先跑編譯，編譯完才跑 openocd 燒錄，保證燒進去的一定是最新版
   - **`-c "program $< verify reset exit 0x08000000"`**
+    - `-c` : 執行命令 (Command)，完整包裹 丟給 **OpenOCD** 去解析
+      - OpenOCD 的指令通常很長且包含空格
+        |特性|GCC 的 `-c`|OpenOCD 的 `-c`|
+        |:---|:---|:---|
+        |全稱|Compile|Command|
+        |語法範例|`gcc -c main.c`|`openocd -c "command"`|
+        |後面接什麼|通常不接東西，或接檔名|必須接引號字串|
+        |功能|產生 .o 檔（機器碼轉譯）|執行硬體操作（燒錄、重啟、擦除）|
+        |層次|編譯階段 (Building)|部署階段 (Flashing)|
     - `program $<` : 燒錄第一個依賴檔
     - `verify` : 燒完檢查對不對
-    - `reset` : 最重要，讓晶片自動重啟，LED 才會立刻開始閃
+    - `reset` : 讓晶片自動重啟，LED 才會立刻開始閃
     - `exit` : 燒完自動結束 OpenOCD，不會卡在終端機
 ## 三、從 ELF 到 BIN
 - #### ELF (Executable and Linkable Format)
