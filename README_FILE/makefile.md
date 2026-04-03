@@ -104,6 +104,24 @@ clean:
     ```
     all: $(BUILD_DIR)/project.bin
     ```
+  - **虛擬目標 (Phony Targets)** : 不是為了產生檔案，而是為了 **執行動作(如燒錄、清理)**
+    - 為了避免目錄下剛好有個檔案叫 clean 而導致衝突，通常會宣告 .PHONY
+      ```
+      # 5. 宣告偽目標
+      .PHONY: all clean flash erase
+
+      # 步驟 D: OpenOCD 一鍵燒錄 (驗證 + 重啟)、擦除、清理指令
+      flash: $(BUILD_DIR)/project.bin
+          $(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET) \
+          -c "program $< verify reset exit 0x08000000"
+        
+      erase:
+          $(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET) \
+          -c "init; halt; stm32f0x mass_erase 0; exit"
+        
+      clean:
+          rm -rf $(BUILD_DIR)
+      ```
 ## 二、關鍵函數與參數解析
 - #### 自動化函數
   - **wildcard** (搜集員)
