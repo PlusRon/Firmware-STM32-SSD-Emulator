@@ -88,23 +88,28 @@ SECTIONS
     - 最後 Linker 進行連結時，才會根據 Linker Script 的指示，把 COMMON 併入 .bss 段落中
     - 所以在 Linker Script 的 .bss 結構裡通常會寫 `*(COMMON)`
 #### 為何 .data-section 需要同時定義 **VMA (虛擬位址)** 與 **LMA (載入位址)** ?
-- 燒錄階段 (Static Storage)
+- **燒錄階段 (Static Storage)**
   - FLASH 是唯一的倉庫，所有的 **.text** 與 **.data** 的初始值都儲存在 FLASH
     - **.text** ： 存放在 FLASH 前面
     - **.data** ： 緊跟在 **.text** 後面，也存在 FLASH 裡
   - 透過 **SWD/JTAG** 介面，使用 OpenOCD 或燒錄器完成
   - 燒錄器會下達 **特殊的硬體命令**（**FLASH Controller**）來 **解鎖 FLASH** 並寫入資料，這時不受 Linker Script 的權限屬性限制
-- 啟動階段 (Move Process)
+- **啟動階段 (Move Process)**
   - 按下 Reset 後，CPU 執行 `startup.c` 中的 `Reset_Handler()`
   - 根據 Linker Script 提供的符號（`_sidata`, `_sdata`, `_edata`），跑 while 迴圈，將變數初始值從 FLASH 搬移到 RAM
   - 順便把 **.bss** 段，在 RAM 裡全部填 0
-- 執行階段 (Execution)
+- **執行階段 (Execution)**
   - 搬家完成後，`Reset_Handler()` 才會呼叫 `main()`
   - 進入 `main()` (**Code in RAM**) 後，CPU 直接存取 RAM 中的變數
   - 程式碼執行時，此刻 FLASH 對 CPU 來說就是 **唯讀**，即使修改變數，FLASH 裡的原始值也不會變
-  - RAM 的存取速度遠高於 FLASH
+  
 #### 為何 SSD 韌體關鍵程式碼要跑在 RAM？
-- FLASH 必須先 **擦除** 才能 **寫入**，且讀取速度較慢
+- RAM 的存取速度遠高於 FLASH
+- RAM 為電晶體構造，CPU 可以隨時用一個指令改寫某個位址
+- FLASH 必須先 **擦除(Erase)** 指令，才能再執行 **寫入(Program)** 指令，且讀取速度較慢
+  - **擦除(Erase)** : 將 **0 變 1**，**釋放電子**，將所有 Cell 清空為全 1 的準備動作
+  - **寫入(Program)** : 將 **1 變 0**，**注入電子**，選擇性地把某幾個 Cell 的 1 改成 0 來存入資訊
+  - **無法單獨** 將已經為 **0 的位元變回 1**，，必須通過 **擦除整個區域** 還原
 - 為了讓 SSD 達極限讀寫效能，關鍵的 **FTL 查表** 與 **ECC 糾錯演算法** 都會像 .data 一樣，在**開機後搬移至 RAM（或 ITCM）中執行**
 
 #### 檢查編譯後的某個目標檔案，其各個 抽屜(`.text`, `.data`, `.bss`) 的 大小與分配
