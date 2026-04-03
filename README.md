@@ -28,13 +28,15 @@ Firmware-STM32-SSD-Emulator
   - `ALIGN(4)` : 強迫資料從 **4 位元組對齊** 的位址開始，確保 **CPU 最高效率存取**
   - `ORIGIN`, `LENGTH` : 記憶體區塊的起始位址與大小
 - #### [linker_script.ld 實作](README_FILE/linker_script.md)
+  - **MEMORY** 程式碼區塊
+  - **SECTIONS** 程式碼區塊
 
 #### 撰寫開機導引 (Boot Startup)
 STM32 通電（Power-on）或按下 Reset 鍵的那一刻，CPU 並不具備執行 C 語言環境的能力，必須撰寫 `startup.c` 來手動配置硬體環境，並引導系統進入 `main()`
 - #### [startup.c 實作]()
-  - 中斷向量表 (Vector Table) : 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 FLASH 起始處
-  - `Reset_Handler()` 程式： 資料搬家 與 環境初始化
-  - 異常時，自動恢復與軟體重置
+  - **中斷向量表 (Vector Table)** : 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 FLASH 起始處
+  - **`Reset_Handler()` 程式**： 資料搬家 與 環境初始化
+  - 異常時，**自動恢復與軟體重置**
 
 
 
