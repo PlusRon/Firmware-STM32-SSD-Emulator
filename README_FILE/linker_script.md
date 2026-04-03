@@ -1,4 +1,4 @@
-## 連結器腳本 Linker_Script.ld 實作
+## 連結器腳本 linker_script.ld 實作
 ```
 /* 1. Define Memory Block */
 MEMORY
