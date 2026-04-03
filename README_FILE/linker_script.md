@@ -43,7 +43,7 @@ SECTIONS
     } > RAM
 }
 ```
-### 一、程式碼 - 撰寫
+## 一、程式碼 - 撰寫
 - **記憶體(MEMORY)** 
   - 區塊名稱 : `FLASH`, `RAM`, `SRAM`, `ITCM`， (可改自行取的代號)
     - `FLASH` : 程式執行期間，該房間的家具無法移動，僅供查看
@@ -88,7 +88,7 @@ SECTIONS
     - 最後 Linker 進行連結時，才會根據 Linker Script 的指示，把 COMMON 併入 .bss 段落中
     - 所以在 Linker Script 的 .bss 結構裡通常會寫 `*(COMMON)`
 
-### 二、程式碼 - 理論問題探討
+## 二、程式碼 - 理論問題探討
 #### 為何 .data-section 需要同時定義 **VMA (虛擬位址)** 與 **LMA (載入位址)** ?
 - **燒錄階段 (Static Storage)**
   - FLASH 是唯一的倉庫，所有的 **.text** 與 **.data** 的初始值都儲存在 FLASH
@@ -124,7 +124,7 @@ arm-none-eabi-objdump -h build/main.o
 - 顯示 **.text**  **.data**  **.bss** 各自佔用的空間
 - `-h` 代表查看 Header（標頭）
 
-### 三、計算機架構 - 硬體架構與記憶體映射 (Memory Mapping)
+## 三、計算機架構 - 硬體架構與記憶體映射 (Memory Mapping)
 撰寫 Linker Script 時，定義的 `FLASH (rx)` 與 `RAM (rwx)`，不只是軟體設定，而是對應到微處理器底層的 **匯流排架構 (Bus Architecture)** 與 **位址解碼機制**
 #### 改良型哈佛架構 (Modified Harvard Architecture)
 - 多數 STM32 (ARM Cortex-M 晶片) 採用改良型哈佛架構，其核心特徵在於物理路徑 **完全獨立**，**程式碼** 和 **資料** 分開走
