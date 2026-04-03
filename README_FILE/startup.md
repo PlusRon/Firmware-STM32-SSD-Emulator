@@ -110,7 +110,7 @@ void Reset_Handler(void) {
 ## 三、防禦性編程 (Defensive Programming) : 自動恢復與軟體重置
 在 SSD 韌體開發中，**資料可用性 (Data Availability)** 至關重要。若程式邏輯發生**異常意外從 `main()` 退出**，必須追求 **即時恢復 (Instant Recovery)**，而非空轉 `while(1)` 等待 看門狗(Watchdog)
 - **軟體觸發重置 (AIRCR 操作)**
-  - 接操作 ARM Cortex-M 內核的 **系統控制區 (SCS)**
+  - 接操作 ARM Cortex-M 內核的 **系統控制區 (SCB)**
   - 寫入 **AIRCR 暫存器** 要求晶片立即重啟
 ```
 void system_soft_reset(void) {
@@ -126,6 +126,15 @@ void system_soft_reset(void) {
     - **Watchdog** 通常設定為數百 **毫秒** 的週期
     - 主動呼叫 **`system_soft_reset()`** 能將 **系統斷線時間 (Downtime)** 縮減至 **微秒** 等級
 
+### 系統控制區 SCS (System Control Space) 的 AIRCR 暫存器
+- #### 查閱 [Cortex-M0 Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)
+  - ARM 將 **系統控制相關的暫存器** 集中在 **SCB (System Control Block)** 區域
+  - SCB 的基底位址 (Base Address) 是 0xE000 ED00
+    <img width="769" height="71" alt="image" src="https://github.com/user-attachments/assets/5f4dcfcf-4bee-49e0-a905-579dc841cae8" />
+
+  - AIRCR (Application Interrupt and Reset Control Register) 的偏移量 (Offset) 是 0x0C
+    <img width="1303" height="981" alt="image" src="https://github.com/user-attachments/assets/5d9c7f76-c93c-4414-a040-5d5e6c6d52ab" />
 
 
+  - 計算結果 **AIRCR 暫存器位址** ： 0xE000 ED00 + 0x0C = **0xE000ED0C**
 
