@@ -57,14 +57,14 @@ SECTIONS
     |`a`|Allocatable|可分配空間|
     
 - **段落(SECTIONS)**
-  - **Regoin 結構名稱** : `.text`, `.data`, `.bss`，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
+  - **Regoin 結構名稱** : **.text**、 **.data**、 **.bss**，為慣用名稱，但連結器並不強制要求結構名稱 (可自訂)
     - `.text` :  在 FLASH 裡規劃一個 **.text-region**
       - 在所有編譯好的檔案中找到標籤為 `.isr_vector` 的檔案，放到 FLASH 最前面，且不准刪掉
         - `.isr_vector` 會在 `startup.c` 中定義的段落名稱，專門放 **中斷向量（Reset, NMI, HardFault 等位址）**
         - `KEEP(...)` : 因為連結器有 Garbage Collection 功能。如果連結器發現 `main()` 沒用到某個函式，為了省空間會把它刪掉
-      - `*(.text*)` : 將標籤開頭是 `.text` 的機器碼(`.o`)排在向量表後面
+      - `*(.text*)` : 將標籤開頭是 **.text** 的機器碼(`.o`)排在向量表後面
         - 第一個 `*`（檔案過濾器）: 所有的輸入檔案(.o)
-        - `.text*` : 不管是 `.text` 還是 `.text.什麼什麼`，全部一網打盡
+        - `.text*` : 不管是 **.text** 還是 **.text.什麼什麼**，全部一網打盡
       - `*(.rodata*)` : 唯讀資料 (常數、字串)
       - `. = ALIGN(4);` : 將存放 程式碼的 **.text-region** 起始處 與 結束處 對齊 4 的倍數 (FLASH 對齊)，以提高效率
       - `_etext = .;` : 取出經過對齊後的 **.text-region** 之結束位址，作為 下一個 存放 已初始化全域變數 **.data-region** 在 FLASH 中的起始位址對齊
@@ -91,7 +91,7 @@ SECTIONS
 - 燒錄階段 (Static Storage)
   - FLASH 是唯一的倉庫，所有的 **.text** 與 **.data** 的初始值都儲存在 FLASH
     - **.text** ： 存放在 FLASH 前面
-    - **.data** ： 緊跟在 .text 後面，也存在 FLASH 裡
+    - **.data** ： 緊跟在 **.text** 後面，也存在 FLASH 裡
   - 透過 **SWD/JTAG** 介面，使用 OpenOCD 或燒錄器完成
   - 燒錄器會下達 **特殊的硬體命令**（**FLASH Controller**）來 **解鎖 FLASH** 並寫入資料，這時不受 Linker Script 的權限屬性限制
 - 啟動階段 (Move Process)
@@ -108,7 +108,7 @@ SECTIONS
 ```
 arm-none-eabi-objdump -h build/main.o
 ```
-- 顯示 .text, .data, .bss 各自佔用的空間
+- 顯示 **.text** , **.data** , **.bss** 各自佔用的空間
 - `-h` 代表查看 Header（標頭）
 
 
