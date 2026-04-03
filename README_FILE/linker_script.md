@@ -74,6 +74,12 @@ SECTIONS
       - `*(.data*)` : 收集所有 **初始值的全域變數**，分配空間給他們
       - `_edata = .` : 放完所有 初始值之全域變數的檔案資料後，再次記錄 **當前位置**。
         - `startup.c` 計算 `_edata - _sdata`，就知道總共要從 FLASH 搬多少 Byte 到 RAM 裡
+      - `> RAM` : 執行地址 **VMA (Virtual Memory Address, 程式執行)**，因為 RAM 才能寫入資料，程式跑起來後，必須去 RAM 找這些變數
+      - `AT > FLASH` : 載入地址 **LMA (Load Memory Address, 斷電、燒錄)**，告訴燒錄器，有初始值的全域變數在斷電時必須儲存在 FLASH
+        ```
+        處理大型專案時，有時會用 LOADADDR(.data) 函數抓取 AT 所指定的 FLASH 地址
+        _sidata = LOADADDR(.data);  /* 抓取 .data 在 FLASH 裡的 倉庫地址 */
+        ```
   - **符號 (Symbols)** : Region 中的變數名
     - `_stext`, `_etext`, `_sdata`, `_edata`, `_estack` （可自訂）
     - 提供給 `startup.c` 使用的 地址變數名
