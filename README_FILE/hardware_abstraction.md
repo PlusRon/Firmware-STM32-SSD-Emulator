@@ -100,11 +100,12 @@ typedef struct {
       - **原子操作 (Atomic Operations)** : 處理 **共用控制暫存器** 的標準做法，利用 **Read-Modify-Write (RMW)** 操作 (**|=、&=、^|**)，確保只針對第 19 位元進行 Set，不干擾暫存器中其他的配置狀態
         - RCC_AHBENR 暫存器中同時控制了多個關鍵外設（如 GPIOA, GPIOB, DMA 等）。如果直接使用 **= 賦值** 會意外地將其他已經開啟的外設時鐘全部關閉
 - **GPIOC (周邊基底)內部**  : 不同的功能之暫存器有各自的偏移，例如 **ODR (Output Data Register)** 的偏移為 **0x14**
-  - **計算公式** : $Address_{ODR} = Base_{GPIOC} + Offset_{ODR} = 0x4800 0800 + 0x14 = 0x48000814$
+  - **計算公式** : $Address_{MODER} = Base_{GPIOC} + Offset_{MODER} = 0x4800 0800 + 0x00 = 0x48000800$
     - **GPIOC->MODER** 的最終地址: **0x48000800**
       - 四種模式，輸入、輸出、複用、類比
       - 硬體設計上規定，每個 Pin 腳 的 Mode 佔用 **2 個 Bits 去控制**
       - MODER 的 **Bit 12, 13** ： 是一個 **多工器 (MUX)** 電路，負責切換 **Pin 腳 6** 的電路路徑為哪種模式 (輸入、輸出、複用、類比)
+  - **計算公式** : $Address_{ODR} = Base_{GPIOC} + Offset_{ODR} = 0x4800 0800 + 0x14 = 0x48000814$
     - **GPIOC->ODR** 的最終地址: **0x48000814**
       - ODR 的 Bit 6 會連接到一個 **輸出驅動器 (Output Driver)** 電路，負責把電壓送到 Pin 6
   
