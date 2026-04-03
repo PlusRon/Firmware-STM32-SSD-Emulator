@@ -151,16 +151,17 @@ clean:
   - **`-c "program $< verify reset exit 0x08000000"`**
     - `-c` : 執行命令 (Command)，完整包裹 丟給 **OpenOCD** 去解析
       - OpenOCD 的指令通常很長且包含空格
+      - 將複雜的 **硬體調適指令（JTAG/SWD）** 封裝進單一 Shell 動作中
         |特性|GCC 的 `-c`|OpenOCD 的 `-c`|
         |:---|:---|:---|
-        |全稱|Compile|Command|
-        |語法範例|`gcc -c main.c`|`openocd -c "command"`|
-        |後面接什麼|通常不接東西，或接檔名|必須接引號字串|
-        |功能|產生 .o 檔（機器碼轉譯）|執行硬體操作（燒錄、重啟、擦除）|
-        |層次|編譯階段 (Building)|部署階段 (Flashing)|
-    - `program $<` : 燒錄第一個依賴檔
-    - `verify` : 燒完檢查對不對
-    - `reset` : 讓晶片自動重啟，LED 才會立刻開始閃
+        |**全稱**|Compile|Command|
+        |**語法範例**|`gcc -c main.c`|`openocd -c "command"`|
+        |**後面接什麼**|通常不接東西，或接檔名|必須接引號字串|
+        |**功能**|產生 .o 檔（機器碼轉譯）|執行硬體操作（燒錄、重啟、擦除）|
+        |**層次**|編譯階段 (Building)|部署階段 (Flashing)|
+    - `program $<` : 燒錄第一個依賴檔，把最新的 `.bin` 檔案搬進 STM32 的 Flash（地址 **0x08000000**）
+    - `verify` : 燒完檢查對不對，讀取 Flash 內容並與原本的 `.bin` 比對，確保資料沒寫錯
+    - `reset` : 對晶片下達**硬體復位**指令，讓晶片**自動重啟**，讓程式立刻**從 `main()` 開始跑**，LED 才會立刻開始閃
     - `exit` : 燒完自動結束 OpenOCD，不會卡在終端機
 ## 三、從 ELF 到 BIN
 - #### ELF (Executable and Linkable Format)
