@@ -68,6 +68,24 @@ sequenceDiagram
   - #### [stm32f072xb.h 底層暫存器定義實作](README_FILE/hardware_abstraction.md)
 - #### 應用邏輯層 (`src/`)
   - #### [LED (PC6) 亮滅實作](README_FILE/LED_flashing_main.md)
+    ```mermaid
+    sequenceDiagram
+    participant CPU as 核心 (main)
+    participant RCC as RCC 暫存器
+    participant GPIO as GPIOC 暫存器
+    participant LED as 物理引腳 (PC6)
+
+    CPU->>RCC: 寫入 AHBENR (開啟 GPIOC 供電)
+    Note right of RCC: IOPCEN = 1
+    CPU->>GPIO: 修改 MODER (設定模式)
+    Note right of GPIO: MODER6 = 01 (Output)
+    
+    loop Every Cycle
+        CPU->>GPIO: 翻轉 ODR 暫存器 (XOR)
+        GPIO->>LED: 電位切換 (High/Low)
+        CPU->>CPU: 執行 NOP 延時 (delay)
+    end
+    ```
 
 ## 四、自動化建置系統 STM32 Makefile 
 為 STM32 (Cortex-M0) 建置一套具備 **增量編譯 (Incremental Build)**、**空間優化 (Space Optimization)** 與 **OpenOCD一鍵燒錄** 功能的 Makefile
