@@ -5,7 +5,7 @@ Firmware-STM32-SSD-Emulator
 本專案捨棄笨重的 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
 - #### [Linux to STM32 開發環境建置](README_FILE/environment_setup.md)
 
-## 硬體 (STM32) 啟動流程 (Bootloader Procedure)
+## 硬體 (STM32) 啟動流程 (Boot startup Procedure)
 ### 查閱硬體邊界 (Memory Mapping)
 根據 STM32F072 的 **[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)**，找出晶片的實體記憶體佈局
 - FLASH (唯讀儲存) : 起始於 `0x08000000`，容量 **128 KB**
@@ -31,7 +31,7 @@ Firmware-STM32-SSD-Emulator
   - **MEMORY** 程式碼區塊
   - **SECTIONS** 程式碼區塊
 
-### 撰寫開機導引 (Boot Startup)
+### 撰寫開機導引 (Bootloader)
 STM32 通電（Power-on）或按下 Reset 鍵的那一刻，CPU 並不具備執行 C 語言環境的能力，必須撰寫 `startup.c` 來手動配置硬體環境，並引導系統進入 `main()`
 - #### [startup.c 實作](README_FILE/startup.md)
   - **中斷向量表 (Vector Table)** : 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 FLASH 起始處
