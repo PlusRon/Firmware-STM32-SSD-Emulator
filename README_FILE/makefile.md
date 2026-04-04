@@ -80,7 +80,7 @@ clean:
 - #### 編譯參數與連結腳本統一管理
   - 確保了團隊開發環境的 **一致性 (Consistency)** 與 **可重複性 (Reproducibility)**
 - #### 標準語法格式
-  - **目標** ： 想產出的 **檔案(project.elf)** 或一個 **任務名稱(clean)**
+  - **目標** ： 想產出的 **檔案(`project.elf`)** 或一個 **任務名稱(`clean)**
   - **依賴項** ： 要完成這個目標，必須先存在的東西，**子函式**的概念
   - **指令** ： 必須**以 Tab 鍵開頭**，告訴系統 當依賴項準備好後，請執行這些 **Shell 指令**
       ```
@@ -148,6 +148,11 @@ clean:
   - **`-c`**  : 給 **GCC(`arm-none-eabi-gcc`)** 看的，只將 `.c` 原始碼 編譯成 **機器碼 `.o` 目標檔 (Object file)**，先不要連結
 - #### 硬體操作指令
   - **`flash: $(BUILD_DIR)/project.bin`** : 當輸入 `make flash` 時 `make` 會先去檢查 `.bin` 是否為最新，若不是（你改了程式），會自動先跑編譯，編譯完才跑 openocd 燒錄，保證燒進去的一定是最新版
+  - **`$(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET)`**
+    - `-f` : 讀取配置，代表 File，OpenOCD 需先載入 **橋樑 (Interface)** 和 **目標晶片 (Target)** 的設定，才能 **正確識別硬體**
+    - `OPENOCD = openocd` : 執行檔，指定燒錄工具
+    - `OCD_INTERFACE = interface/stlink.cfg` : 燒錄器（Debug Probe），STM32 開發板內建 ST-Link，`.cfg` 檔包含如何與 ST-Link 通訊的底層參數
+    - `OCD_TARGET = target/stm32f0x.cfg` : 告訴 OpenOCD 目標晶片型號，不同系列的晶片（F0, F1, F4） **Flash 大小**、**暫存器位址**都不同，這份檔案定義了 **STM32F0 系列的硬體特性**
   - **`-c "program $< verify reset exit 0x08000000"`**
     - `-c` : 執行命令 (Command)，完整包裹 丟給 **OpenOCD** 去解析
       - OpenOCD 的指令通常很長且包含空格
@@ -159,10 +164,10 @@ clean:
         |**後面接什麼**|通常不接東西，或接檔名|必須接引號字串|
         |**功能**|產生 .o 檔（機器碼轉譯）|執行硬體操作（燒錄、重啟、擦除）|
         |**層次**|編譯階段 (Building)|部署階段 (Flashing)|
-    - `program $<` : 燒錄第一個依賴檔，把最新的 `.bin` 檔案搬進 STM32 的 Flash（地址 **0x08000000**）
-    - `verify` : 燒完檢查對不對，讀取 Flash 內容並與原本的 `.bin` 比對，確保資料沒寫錯
+    - `program $<` : 燒錄第一個依賴檔，把最新的 `.bin` 二進位檔案搬進 STM32 的 Flash（地址 **0x08000000**）
+    - `verify` : 防止燒錄失敗，燒完後會讀取 FLASH 內容並與電腦上的 `.bin` 比對是否100% 一致，確保資料沒寫錯
     - `reset` : 對晶片下達**硬體復位**指令，讓晶片**自動重啟**，讓程式立刻**從 `main()` 開始跑**，LED 才會立刻開始閃
-    - `exit` : 燒完自動結束 OpenOCD，不會卡在終端機
+    - `exit` : 燒完自動 **切斷與晶片連線** 並 **關閉 OpenOCD** 程序，將終端機控制權還給使用者
 ## 三、從 ELF 到 BIN
 - #### ELF (Executable and Linkable Format)
   - 包含 **機器碼** + **符號表** + **除錯資訊**
@@ -171,6 +176,11 @@ clean:
   - 純粹的機器碼
   - **丟掉** 所有人類 **可讀標籤**，只留下 0 與 1
   - 能**燒進 STM32 Flash** 執行（從 **0x08000000** 開始）的東西
+
+
+
+
+
 
 
 
