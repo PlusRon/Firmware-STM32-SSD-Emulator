@@ -131,12 +131,18 @@ clean:
     - `wildcard` ： 函數的名稱
     - `app/*.c` ： 搜尋模式，`*` 萬用符號，代表 任何字元。找出 `app/` 資料夾下，所有 `.c` 結尾的檔案
   - **patsubst** (計畫員)
-    - `OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRCS))` 在記憶體中預先畫好一張 待產清單，**定義未來 `.o` 的存放位置**
-    - 建立 **模式規則 (Pattern Rules)**，讓每個 .c 獨立編譯成一個 .o 檔
-    - 當只改動 `main.c` 時，make 只會重新編譯 `main.o`，而不會去動其他的 `startup.o`，這能大幅縮短大型專案的編譯時間
-- #### 參數 - 連結器的斷捨離
+    - `OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRCS))`
+      - 建立 **模式規則 (Pattern Rules)**，讓每個 `.c` 獨立編譯成一個 `.o` 檔(建立`.c` 與 `.o` 之間的一對一標籤關係)
+      -  在記憶體中預先畫好一張 待產清單，**定義未來 `.o` 的存放位置**
+    - `$(BUILD_DIR)/%.o: %.c`
+      - `%` : 通用模板，變數捕捉器
+      - 當 make 需要 `build/app/main.o` 時，會透過模板 `% = app/main` 自動去找到 `app/main.c` 來編譯
+      - 當只改動 `main.c` 時，make 只會重新編譯 `main.o`，而不會去動其他的 `startup.o`，這能大幅縮短大型專案的編譯時間
+- #### 空間優化參數 - 連結器的斷捨離
   -  **`-ffunction-sections`**
-    - 告訴編譯器把 **每個函式** 放在 **獨立的小隔間**
+    - **函式獨立裝箱**，告訴編譯器把 **每個函式** 放在 **獨立的小隔間** (因為預設編譯器會把**同一個 `.c` 檔裡的所有函式**塞進同一個 **大隔間 Section**)
+  - **`-fdata-sections`**
+    - **資料獨立裝箱**，針對 **全域變數**
   - **`-nostdlib`**
     - 韌體開發中，需要 **極致控制權**，避開龐大的電腦標準庫，使二進位檔體積從 **幾百 KB** 壓縮至 **幾 KB**
   - **`-Wl,--gc-sections`**
@@ -146,6 +152,16 @@ clean:
   - **`$@`** : 為 **自動變數**，代表 **目標名稱**
   - **`$<`** : 為 **自動變數**，代表 **第一個依賴項**
   - **`-c`**  : 給 **GCC(`arm-none-eabi-gcc`)** 看的，只將 `.c` 原始碼 編譯成 **機器碼 `.o` 目標檔 (Object file)**，先不要連結
+  - **`$(dir $@)`** : 內建函數，取出目標檔案的**路徑**
+  - **`-p`** : 在 mkdir 中，自動建立父目錄，深層路徑一次建到位，指令重複執行時 **不會因為目錄已存在而報錯** 導致編譯中斷
+- #### 編譯器參數
+  - **`CFLAGS  = -mcpu=cortex-m0 -mthumb -Iinclude -g -O0 -Wall -ffunction-sections -fdata-sections`**
+    - `-mcpu=cortex-m0` : 定義處理器核心 ARM Cortex-M0，讓編譯器根據核心支援的指令（如：有無硬體乘法器）來優化程式碼
+    - `-mthumb` : 強制使用 **Thumb 指令集（16位元為主）**，Cortex-M 系列主要運行於 **Thumb 模式以節省 Flash 空間**。若沒加此參數，編譯器可能產生 M0 **無法執行的 ARM (32-bit) 指令**，導致 **HardFault**
+    - `-Iinclude` : `-I` 代表 Include，告訴編譯器到 `include/` 資料夾下尋找 `.h` 檔案，就可以在程式碼中直接寫 `#include "main.h"` 而**不必寫冗長的全路徑**
+    - `-g` : 產生除錯資訊，在 ELF 檔案中加入**符號表（Symbol Table）**。當使用 **GDB** 或 **ST-Link Debugger** 時，電腦才能將 **機器碼對應到 C 語言原始碼行號**
+    - `-O0` : 優化等級零，**不進行任何優化**。在開發階段極重要，因為優化（如 **-O2, -Os**）會重排或刪除程式碼，導致除錯時跳行或變數被自動抹除
+    - `-Wall` : 開啟所有常用警告，代表 Warnings all，因為專業工程師會追求 Zero Warnings
 - #### 硬體操作指令
   - **`flash: $(BUILD_DIR)/project.bin`** : 當輸入 `make flash` 時 `make` 會先去檢查 `.bin` 是否為最新，若不是（你改了程式），會自動先跑編譯，編譯完才跑 openocd 燒錄，保證燒進去的一定是最新版
   - **`$(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET)`**
