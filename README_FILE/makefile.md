@@ -125,12 +125,12 @@ clean:
     ```
 ## 二、關鍵函數,參數解析,程式邏輯
 - #### 自動化函數
-  - **wildcard** (搜集員)
+  - **wildcard** (搜集員, 萬用字元)
     - `SRCS = $(wildcard app/*.c)` 會掃描硬碟，找出所有**真實存在的原始碼**
     - `$` ： 代表呼叫 Makefile 的函數
     - `wildcard` ： 函數的名稱
     - `app/*.c` ： 搜尋模式，`*` 萬用符號，代表 任何字元。找出 `app/` 資料夾下，所有 `.c` 結尾的檔案
-  - **patsubst** (計畫員)
+  - **patsubst** (計畫員, Pattern Substitution)
     - `OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRCS))`
       - 建立 **模式規則 (Pattern Rules)**，讓每個 `.c` 獨立編譯成一個 `.o` 檔(建立`.c` 與 `.o` 之間的一對一標籤關係)
       -  在記憶體中預先畫好一張 待產清單，**定義未來 `.o` 的存放位置**
@@ -162,6 +162,11 @@ clean:
     - `-g` : 產生除錯資訊，在 ELF 檔案中加入**符號表（Symbol Table）**。當使用 **GDB** 或 **ST-Link Debugger** 時，電腦才能將 **機器碼對應到 C 語言原始碼行號**
     - `-O0` : 優化等級零，**不進行任何優化**。在開發階段極重要，因為優化（如 **-O2, -Os**）會重排或刪除程式碼，導致除錯時跳行或變數被自動抹除
     - `-Wall` : 開啟所有常用警告，代表 Warnings all，因為專業工程師會追求 Zero Warnings
+- #### 連結器參數
+  - **`LDFLAGS = -T $(LINKER_SCRIPT) -nostdlib -Wl,--gc-sections`**
+    - `-T $(LINKER_SCRIPT)` : `-T` 代表 Script，按照指定的連結腳本 (`stm32.ld`) 來擺放程式碼與資料
+    - `-nostdlib` : 不要連結 C 語言的標準函式庫 (`libc`, `libm`)，準庫是為有作業系統（Linux/Windows）的環境設計的
+    - `-Wl,--gc-sections` : `-Wl` 告訴 GCC 將後面的參數傳遞給底層的 Linker (ld)，`--gc-sections` 代表 Garbage Collection of Sections
 - #### 硬體操作指令
   - **`flash: $(BUILD_DIR)/project.bin`** : 當輸入 `make flash` 時 `make` 會先去檢查 `.bin` 是否為最新，若不是（你改了程式），會自動先跑編譯，編譯完才跑 openocd 燒錄，保證燒進去的一定是最新版
   - **`$(OPENOCD) -f $(OCD_INTERFACE) -f $(OCD_TARGET)`**
