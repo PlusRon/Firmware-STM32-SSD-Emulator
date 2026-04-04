@@ -1,0 +1,20 @@
+# --- Build Artifacts ---
+build/
+*.o
+*.elf
+*.bin
+#*.map
+#*.lst
+
+# --- OS Register ---
+#.DS_Store
+#Thumbs.db
+
+# --- logs file  ---
+logs/
+*.log
+
+# --- compiler setting ---
+#.vscode/
+#.idea/
+#*.swp
