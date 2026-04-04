@@ -3,6 +3,16 @@ Firmware-STM32-SSD-Emulator
 
 ## 開發環境 (Environment Setup)
 本專案捨棄笨重的 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
+- #### Hardware Requirements
+  |開發版 (Dev Board) | **STM32F072B-DISCOVERY** |
+  |:---|:---|
+  |**調試器 (Debugger)**|**ST-Link V2**|
+  |**傳輸線 (Cable)** | **Mini-USB**|
+- #### Software Toolchain
+  |編譯器 (Compiler) | **GNU Arm Embedded Toolchain** |
+  |:---|:---|
+  |**建置工具 (Build Tool)**|**GNU Make**|
+  |**燒錄、除錯 (Flashing & Debugging)** | **OpenOCD**|
 - #### [Linux to STM32 開發環境建置](README_FILE/environment_setup.md)
 
 ## 硬體 (STM32) 啟動流程 (Boot startup Procedure)
