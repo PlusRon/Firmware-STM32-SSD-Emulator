@@ -43,6 +43,21 @@ Firmware-STM32-SSD-Emulator
 
 ### 撰寫開機導引 (Bootloader)
 STM32 通電（Power-on）或按下 Reset 鍵的那一刻，CPU 並不具備執行 C 語言環境的能力，必須撰寫 `startup.c` 來手動配置硬體環境，並引導系統進入 `main()`
+
+```mermaid
+sequenceDiagram
+    participant HW as 硬體 (Reset)
+    participant ST as Startup_Handler
+    participant RAM as 記憶體 (SRAM)
+    participant APP as 使用者程式 (Main)
+
+    HW->>ST: 加載 PC 與 MSP
+    Note over ST: 進入 Reset_Handler
+    ST->>RAM: 複製 .data 段 (Flash -> RAM)
+    ST->>RAM: 清空 .bss 段 (Fill Zero)
+    ST->>ST: 執行 SystemInit (時脈設定)
+    ST->>APP: 跳轉至 main()
+```
 - #### [startup.c 實作](README_FILE/startup.md)
   - **中斷向量表 (Vector Table)** : 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 FLASH 起始處
   - **Reset_Handler 程式**： 資料搬家 與 環境初始化
