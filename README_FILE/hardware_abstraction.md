@@ -24,6 +24,23 @@ typedef struct {
     volatile uint32_t AFRH;     /* 0x24: Function reuse High-bit */
 } GPIO_TypeDef;
 
+
+/* USART Register Structures */
+typedef struct {
+    volatile uint32_t CR1;      /* 0x00: Control register 1 */
+    volatile uint32_t CR2;      /* 0x04: Control register 2 */
+    volatile uint32_t CR3;      /* 0x08: Control register 3 */
+    volatile uint32_t BRR;      /* 0x0C: Baud rate register */
+    volatile uint32_t GTPR;     /* 0x10: Guard time and prescaler */
+    volatile uint32_t RTOR;     /* 0x14: Receiver timeout */
+    volatile uint32_t RQR;      /* 0x18: Request register */
+    volatile uint32_t ISR;      /* 0x1C: Interrupt and status */
+    volatile uint32_t ICR;      /* 0x20: Interrupt flag clear */
+    volatile uint32_t RDR;      /* 0x24: Receive data */
+    volatile uint32_t TDR;      /* 0x28: Transmit data */
+} USART_TypeDef;
+
+
 /* RCC Register Structures (Reset and Clock Gating Control) */
 typedef struct {
     volatile uint32_t CR;        /* 0x00: Clock Control */
@@ -40,11 +57,16 @@ typedef struct {
  * 2. Peripheral Base Addresses
  * ------------------------------------------------------------------------- */
 #define RCC_BASE    (0x40021000UL)
+#define GPIOA_BASE    (0x48000000UL)  // start of AHB2 
 #define GPIOC_BASE  (0x48000800UL)
+#define USART1_BASE   (0x40013800UL)  // from APB2
+
 
 /* Convert the address to struct pointer (Mapping) */
 #define RCC         ((RCC_TypeDef *)  RCC_BASE)          /* AHB1-Bus-Base(0x4002 0000) + RCC-Peripheral-offset(0x4002 1000) */
+#define GPIOA         ((GPIO_TypeDef *)  GPIOA_BASE)
 #define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)        /* AHB2-Bus-Base(0x4800 0000) + GPIOC-Peripheral-offest(0x4800 0800) */
+#define USART1        ((USART_TypeDef *) USART1_BASE)
 
 #endif /* STM32F072XB_H */
 ```
