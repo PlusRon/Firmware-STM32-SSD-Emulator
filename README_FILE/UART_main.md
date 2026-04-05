@@ -38,58 +38,60 @@
     ```
 - **無定址功能** ： **UART** 是 **點對點（Point-to-Point）** 通訊，不像 **I2C** 可以 **一對多**
 
-### A. 終端機模擬軟體 Minicom關鍵參數
+## 二、Minicom 終端機模擬軟體
 **Unix-like 系統 (Linux、macOS)** 中經典且輕量化的 **文字界面(CLI) 序列通訊程式**，是與硬體 (STM32、樹莓派、路由器) 溝通的核心工具。STM32 晶片本身**沒有螢幕**，Minicom 就像是 翻譯官/顯示器，會 **監聽** 電腦的 **USB 序列埠(`/dev/ttyUSB0`)的 UART 之 Rx** 所接收的訊息，將接收到的 **原始電壓訊號 (Hex)** 轉譯為 **人看得懂的ASCII** 文字； 當在 **鍵盤輸入字元**，Minicom 會透過 **USB 序列埠的 UART 之 Tx** 將字元傳送給 **受控端 (STM32)**
 
-- #### 操作設定/運作原理
-  - 運作於 Linux 的 **User Space**，透過 **調用 Kernel 中的序列驅動程式** 來操作硬體
-  - 開啟裝置檔案 `/dev/ttyUSB0`
-  - **常見配置** (**115200 8N1**)
-    |參數|配置|
-    |:---|:---:|
-    |Baud Rate|115200|
-    |Data Bits|8|
-    |Parity|N|
-    |Stop Bit|1|
-    |Hardware Flow Control|N|
-    |Software Flow Control|N|
-    |Local Echo|N|
-    - **`115200`** ： Baud Rate (每秒傳輸的位元數)
-    - **`8`** ： 8 個 Data Bits
-    - **`N`** ： None Parity (不使用校驗位)
-    - **`1`** ： 1 個 Stop Bit
-    - **Hardware Flow Control** (硬體流控)
-      - 底層開發中通常設為 `NO`
-      - 若設 `Yes` : Minicom 會 **等待 CTS/RTS** 訊號，導致鍵盤輸入被鎖死，無法送出指令
-    - **Software Flow Control** : 設為 `NO`，避免特殊字元衝突
-    - **Local Echo** (本地回顯)
-      - 預設關閉 : 必須依賴 **受控端(STM32)將收到的字 再傳回來** 才能看見
-      - 開啟 : 在鍵盤打的字會直接顯現在螢幕上，通常會顯示 **本地回顯 + STM32回傳 (例如. AA)**
-  - 非同步 I/O 運作
-    - **Read** ： Minicom 持續 **監測 Rx 緩衝區**，有字就印在螢幕
-    - **Write** ： Minicom **偵測鍵盤事件**，並立刻透過序列埠 從 **Tx 發出** 字元給受控端 (STM32)
+### A. 運作原理
+- 運作於 Linux 的 **User Space**，透過 **調用 Kernel 中的序列驅動程式** 來操作硬體
+- 開啟裝置檔案 `/dev/ttyUSB0`
+- **常見配置** (**115200 8N1**)
+  |參數|配置|
+  |:---|:---:|
+  |Baud Rate|115200|
+  |Data Bits|8|
+  |Parity|N|
+  |Stop Bit|1|
+  |Hardware Flow Control|N|
+  |Software Flow Control|N|
+  |Local Echo|N|
+  - **`115200`** ： Baud Rate (每秒傳輸的位元數)
+  - **`8`** ： 8 個 Data Bits
+  - **`N`** ： None Parity (不使用校驗位)
+  - **`1`** ： 1 個 Stop Bit
+  - **Hardware Flow Control** (硬體流控)
+    - 底層開發中通常設為 `NO`
+    - 若設 `Yes` : Minicom 會 **等待 CTS/RTS** 訊號，導致鍵盤輸入被鎖死，無法送出指令
+  - **Software Flow Control** : 設為 `NO`，避免特殊字元衝突
+  - **Local Echo** (本地回顯)
+    - 預設關閉 : 必須依賴 **受控端(STM32)將收到的字 再傳回來** 才能看見
+    - 開啟 : 在鍵盤打的字會直接顯現在螢幕上，通常會顯示 **本地回顯 + STM32回傳 (例如. AA)**
+- 非同步 I/O 運作
+  - **Read** ： Minicom 持續 **監測 Rx 緩衝區**，有字就印在螢幕
+  - **Write** ： Minicom **偵測鍵盤事件**，並立刻透過序列埠 從 **Tx 發出** 字元給受控端 (STM32)
+```
+@ 採樣定理與誤差 (Over-sampling)
+為了提高準確度，接收端通常會以比 Baud Rate 快 16 倍的速度進行採樣
+會尋找起始位的下降邊緣，在位元的中間點進行取樣，避開電壓變換時的雜訊與不穩定區間
+```
+### B. 操作 Minicom 軟體
+- **初始化設定** : 初次使用、切換硬體 時
   ```
-  @ 採樣定理與誤差 (Over-sampling)
-  為了提高準確度，接收端通常會以比 Baud Rate 快 16 倍的速度進行採樣
-  會尋找起始位的下降邊緣，在位元的中間點進行取樣，避開電壓變換時的雜訊與不穩定區間
+  sudo minicom -s
   ```
-- #### 實作 SOP
-  - **初始化設定** : 初次使用、切換硬體 時
-    ```
-    sudo minicom -s
-    ```
-    - 進入 **Serial port setup**
-      - 按 `A` ： 修改路徑 為 `/dev/ttyUSB0`
-      - 按 `E` ： 修改速率 為 `115200 8N1`
-      - 按 `F` ： 將 Hardware Flow Control 改為 `No`
-    - 選擇 **Save setup as dfl** ： 將此設定儲存為 **全域預設值**，下次使用同裝置只需輸入 `sudo minicom` 即可
-  - **常用快捷鍵** 選單 (`Ctrl + A` 為前導鍵)
-    - `Ctrl + A` ➔ `Z` ： 顯示 指令集總覽
-    - `Ctrl + A` ➔ `O` ： 開啟設定視窗
-    - `Ctrl + A` ➔ `L` ： 開啟捕捉功能（把輸出的 Log 存成純文字檔，方便分析）
-    - `Ctrl + A` ➔ `X` ： 離開並關閉（離開程式）
-    - `Ctrl + A` ➔ `Q` ： 離開但不關閉（保留序列埠狀態）
-
+  - 進入 **Serial port setup**
+    - 按 `A` ： 修改路徑 為 `/dev/ttyUSB0`
+    - 按 `E` ： 修改速率 為 `115200 8N1`
+    - 按 `F` ： 將 Hardware Flow Control 改為 `No`
+  - 選擇 **Save setup as dfl** ： 將此設定儲存為 **全域預設值**，下次使用同裝置只需輸入 `sudo minicom` 即可
+- **常用快捷鍵** 選單 (`Ctrl + A` 為前導鍵)
+  - `Ctrl + A` ➔ `Z` ： 顯示 指令集總覽
+  - `Ctrl + A` ➔ `O` ： 開啟設定視窗
+  - `Ctrl + A` ➔ `L` ： 開啟捕捉功能（把輸出的 Log 存成純文字檔，方便分析）
+  - `Ctrl + A` ➔ `X` ： 離開並關閉（離開程式）
+  - `Ctrl + A` ➔ `Q` ： 離開但不關閉（保留序列埠狀態）
+- **解決文字往右斜下跳 (階梯狀)**
+  1. 程式碼改用 先`\r` ，才 `\n`
+  2. 按 `Ctrl + A` ➔ `Z` ➔ `U` ，開啟 **Add Carriage Return**
 
 ---
 ```
