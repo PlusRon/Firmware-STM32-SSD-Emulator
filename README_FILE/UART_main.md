@@ -1,6 +1,6 @@
 # UART 應用邏輯 主程式
 
-## 一、理論、技術討論
+## 一、UART 理論技術
 ### 1. UART (Universal Asynchronous Receiver/Transmitter) 通訊協定(介面)
 - **非同步通訊 (UART)** : 雙方 **無共同的時脈**，因此必須事先約定好 **每秒讀取電位的次數 Baud Rate (波特率)**
     ```
