@@ -127,12 +127,29 @@
 - 脫離 (**Detach**) 特性 ： Screen 強大之處，即使關閉電腦視窗，只要 **不手動 Kill Session**，**通訊行程** 依然會在 **後端持續執行**
 
 ### B. 操作 Screen 工具
+- #### 安裝工具
+  ```
+  sudo apt update
+  sudo apt install screen
+  screen -v
+  ```
 - #### 啟動連線
-  ```
-  # 連接到 STM32
-  sudo screen /dev/ttyUSB0 115200
-  ```
   - 若沒給 Baud Rate，Screen **預設為 9600**，會導致 STM32 傳來的 115200 資料變成亂碼
+    ```
+    # 連接到 STM32
+    sudo screen /dev/ttyUSB0 115200
+    ```
+  - `/dev/ttyUSB0` 為 Device
+    - 當 screen 的第一個參數是存在於 `/dev/` 下的設備檔案時，該 session 就會自動切換到 **序列連線模式 (Serial Mode)** 開啟 **硬體串口**
+    - 若寫 `screen -S /dev/ttyUSB0`，screen 會以為要建立一個名稱為 `/dev/ttyUSB0` 的普通虛擬終端，而不會去開啟真正的硬體串口
+  - 參數 `-S` 為 Session Name
+    - 當同時開啟很多個 screen 工作時，為了方便辨認，可以給它一個名字
+    - 當下達 `screen -ls` 時，可以看到所有連線 session 的名稱
+  - 專業下指令 : 結合上述兩種
+    ```
+    # 格式 ： sudo screen -S [自訂名稱] [設備路徑] [Baud Rate]
+    sudo screen -S STM32_Project /dev/ttyUSB0 115200
+    ```
 - #### 核心快捷鍵 (以 `Ctrl + A` 為前導鍵)
   |動作|快捷鍵組合|說明|
   |:---|:---|:---|
