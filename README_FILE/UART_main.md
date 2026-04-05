@@ -90,8 +90,30 @@
   - `Ctrl + A` ➔ `X` ： 離開並關閉（離開程式）
   - `Ctrl + A` ➔ `Q` ： 離開但不關閉（保留序列埠狀態）
 - **解決文字往右斜下跳 (階梯狀)**
-  - 程式碼改用 先`\r` ，才 `\n`
-  - 按 `Ctrl + A` ➔ `Z` ➔ `U` ，開啟 **Add Carriage Return**
+  - 方法一 (修改程式碼)
+    - 改用 先`\r` ，才 `\n`
+      ```
+      // 傳送開機訊息
+      uart_send_char('S');
+      uart_send_char('S');
+      uart_send_char('D');
+      uart_send_char(' ');
+      uart_send_char('R');
+      uart_send_char('D');
+      uart_send_char('Y');
+      uart_send_char('\r'); // Carriage Return: 移回行首
+      uart_send_char('\n'); // Line Feed: 跳到下一行
+      ```
+      ```
+      if (received == '\r' || received == '\n') {
+          uart_send_char('\r');
+          uart_send_char('\n');
+      } else {
+          uart_send_char(received); 
+      }
+      ```
+  - 方法二 (Minicom 設定)
+    - 按 `Ctrl + A` ➔ `Z` ➔ `U` ，開啟 **Add Carriage Return**
 
 ---
 ```
