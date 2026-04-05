@@ -6,6 +6,95 @@
 void uart_init(uint32_t baudrate);
 void uart_send_char(char c);
 char uart_receive_char(void);
+void delay(int32_t count);
+
+/**
+ * @brief 延時函式
+ */
+void delay(int32_t count) {
+    while (count--) {
+        __asm("nop");
+    }
+}
+
+/**
+ * @brief 初始化 USART1 (PA9=TX, PA10=RX)
+ */
+void uart_init(uint32_t baudrate) {
+    /* 1. 開啟時脈 */
+    RCC->AHBENR |= (1UL << 17);  // GPIOA Clock
+    RCC->APB2ENR |= (1UL << 14); // USART1 Clock
+
+    /* 2. 設定 GPIOA 模式 (PA9, PA10) */
+    GPIOA->MODER &= ~((3UL << 18) | (3UL << 20)); 
+    GPIOA->MODER |=  ((2UL << 18) | (2UL << 20)); // AF Mode (10)
+
+    /* 3. 設定複用功能 (AF1) */
+    GPIOA->AFRH &= ~((0xFUL << 4) | (0xFUL << 8));
+    GPIOA->AFRH |=  ((1UL << 4)  | (1UL << 8));   // AF1 為 USART1
+
+    /* 4. 設定波特率 (關鍵修改) */
+    // 假設系統跑 HSI 8MHz。 8,000,000 / 115200 ≈ 69
+    // 直接賦值避免編譯器呼叫不存在的除法函式
+    USART1->BRR = 69; 
+
+    /* 5. 啟動 USART1 */
+    USART1->CR1 |= (1UL << 0) | (1UL << 3) | (1UL << 2);
+}
+
+void uart_send_char(char c) {
+    while (!(USART1->ISR & (1UL << 7)));
+    USART1->TDR = c;
+}
+
+char uart_receive_char(void) {
+    while (!(USART1->ISR & (1UL << 5)));
+    return (char)(USART1->RDR);
+}
+
+int main(void) {
+    /* --- 診斷代碼：點亮 PC9 綠色 LED --- */
+    RCC->AHBENR |= (1UL << 19);     // 開啟 GPIOC 時脈
+    GPIOC->MODER &= ~(3UL << 18);   // 清除 PC9 設定
+    GPIOC->MODER |=  (1UL << 18);   // 設定 PC9 為輸出 (01)
+    GPIOC->ODR |= (1UL << 9);       // 先點亮 LED，證明程式已進入 main
+
+    // 初始化 UART
+    uart_init(115200);
+
+    // 傳送開機訊息
+    uart_send_char('S');
+    uart_send_char('S');
+    uart_send_char('D');
+    uart_send_char(' ');
+    uart_send_char('R');
+    uart_send_char('D');
+    uart_send_char('Y');
+    uart_send_char('\n');
+
+    while (1) {
+        /* --- 診斷代碼：讓 LED 翻轉，證明程式沒當掉 --- */
+        // 每收到一個字元就翻轉一次 LED 狀態
+        char received = uart_receive_char();
+        
+        // 翻轉 PC9 LED
+        GPIOC->ODR ^= (1UL << 9);
+        
+        // Echo 回傳
+        uart_send_char(received); 
+    }
+
+    return 0;
+}
+```
+
+```
+#include "stm32f072xb.h"
+
+// 函式原型宣告
+void uart_init(uint32_t baudrate);
+void uart_send_char(char c);
+char uart_receive_char(void);
 
 /**
  * @brief 延時函式 (防止編譯器優化)
