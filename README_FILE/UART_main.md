@@ -38,7 +38,7 @@
     ```
 - **無定址功能** ： **UART** 是 **點對點（Point-to-Point）** 通訊，不像 **I2C** 可以 **一對多**
 
-## 二、Minicom 終端機模擬軟體
+## 二、Minicom 終端機模擬軟體 - 序列通訊工具
 **Unix-like 系統 (Linux、macOS)** 中經典且輕量化的 **文字界面(CLI) 序列通訊程式**，是與硬體 (STM32、樹莓派、路由器) 溝通的核心工具。STM32 晶片本身**沒有螢幕**，Minicom 就像是 翻譯官/顯示器，會 **監聽** 電腦的 **USB 序列埠(`/dev/ttyUSB0`)的 UART 之 Rx** 所接收的訊息，將接收到的 **原始電壓訊號 (Hex)** 轉譯為 **人看得懂的ASCII** 文字； 當在 **鍵盤輸入字元**，Minicom 會透過 **USB 序列埠的 UART 之 Tx** 將字元傳送給 **受控端 (STM32)**
 
 ### A. 運作原理
@@ -117,8 +117,32 @@
       ```
   - **方法二 (Minicom 設定)**
     - 按 `Ctrl + A` ➔ `Z` ➔ `U` ，開啟 **Add Carriage Return**
+## 三、GNU Screen 終端機虛擬視窗 - 序列連接工具
+是一個 **全螢幕視窗管理器**，將單一的 **終端機界面（Terminal）** 分割成 **多個** 橫向或縱向的 **虛擬視窗**。韌體開發領域，主要利用它的 **序列連接（Serial Connection）** 功能，可直接 **掛載設備檔案** 並建立與硬體的高速通訊
 
-## 三、硬體環境設置
+### A. 運作原理
+- 透過底層 **系統調用(System Calls)**，直接與 Linux 的 **tty(Teletype)** 驅動程式對話
+- 下達 **設備連接** 指令時，Screen 會建立一個 **獨立的 Session**
+- **劫持 I/O** ： 獨立的 Session 會接管當前終端機的 **鍵盤輸入(Standard Input)** 並 **導向至序列埠的 TX**，同時將 **RX 收到的資料即時渲染到該 Session 螢幕**
+- 脫離 (**Detach**) 特性 ： Screen 強大之處，即使關閉電腦視窗，只要 **不手動 Kill Session**，**通訊行程** 依然會在 **後端持續執行**
+
+### B. 操作 Screen 工具
+- #### 啟動連線
+  ```
+  # 連接到 STM32
+  sudo screen /dev/ttyUSB0 115200
+  ```
+  - 若沒給 Baud Rate，Screen **預設為 9600**，會導致 STM32 傳來的 115200 資料變成亂碼
+- #### 核心快捷鍵 (以 `Ctrl + A` 為前導鍵)
+  |動作|快捷鍵組合|說明|
+  |:---|:---|:---|
+  
+  退出並關閉	Ctrl + A ➔ K (Kill)	徹底終止通訊並釋放 /dev/ttyUSB0。
+脫離會話	Ctrl + A ➔ D (Detach)	暫時退出，但連線在後端繼續跑（Log 繼續收）。
+恢復會話	screen -r	重新接回剛才脫離的連線。
+清除螢幕	Ctrl + A ➔ C	建立新視窗（在多工模式下使用）。
+
+## 四、硬體環境設置
 Rx 與 Tx **交叉原則**、**共地原則**
 | STM32F072 | USB-to-TTL 模組 | 說明 |
 |:---:|:---:|:---|
@@ -126,7 +150,7 @@ Rx 與 Tx **交叉原則**、**共地原則**
 |**PA9 (TX)**|**RXD**|晶片資料出口連至電腦入口|
 |**PA10 (RX)**|**TXD**|電腦資料出口連至晶片入口|
 
-## 四、韌體實作細節 (Firmware)
+## 五、韌體實作細節 (Firmware)
 ```
 #include "stm32f072xb.h"
 
@@ -225,7 +249,7 @@ int main(void) {
     return 0;
 }
 ```
-## 五、除錯與驗證 (Troubleshooting)
+## 六、除錯與驗證 (Troubleshooting)
 ### 模組迴圈測試 (Loopback Test)
 - 將 USB 模組 **TXD 與 RXD 短路**
 - 開啟 Minicom **Local Echo**
