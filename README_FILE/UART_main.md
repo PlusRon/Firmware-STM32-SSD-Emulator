@@ -73,7 +73,8 @@ int main(void) {
     uart_send_char('R');
     uart_send_char('D');
     uart_send_char('Y');
-    uart_send_char('\n');
+    uart_send_char('\r'); // Carriage Return: 移回行首
+    uart_send_char('\n'); // Line Feed: 跳到下一行
 
     while (1) {
         /* --- 診斷代碼：讓 LED 翻轉，證明程式沒當掉 --- */
@@ -82,9 +83,18 @@ int main(void) {
         
         // 翻轉 PC9 LED
         GPIOC->ODR ^= (1UL << 9);
-        
+
+
+        // Echo 回傳：如果你希望打字換行也正常，可以判斷收到的字
+        if (received == '\r' || received == '\n') {
+            uart_send_char('\r');
+            uart_send_char('\n');
+        } else {
+            uart_send_char(received); 
+        }
+
         // Echo 回傳
-        uart_send_char(received); 
+        // uart_send_char(received); 
     }
 
     return 0;
