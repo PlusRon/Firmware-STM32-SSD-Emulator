@@ -142,6 +142,16 @@
   - `/dev/ttyUSB0` 為 Device
     - 當 screen 的第一個參數是存在於 `/dev/` 下的設備檔案時，該 session 就會自動切換到 **序列連線模式 (Serial Mode)** 開啟 **硬體串口**
     - 若寫 `screen -S /dev/ttyUSB0`，screen 會以為要建立一個名稱為 `/dev/ttyUSB0` 的普通虛擬終端，而不會去開啟真正的硬體串口
+- #### 指令操作
+  |指令|功能說明|
+  |:---|:---|
+  |sudo screen /dev/ttyUSB0 115200|序列硬體串扣(簡模式) : 直接連線，Baud Rate 必填|
+  |sudo screen -S My_session|開普通終端(具名模式)|
+  |sudo screen -S [自訂名稱] [設備路徑] [Baud Rate]|序列硬體串扣(具名模式) ： 名為 MyUART，方便後續恢復連線|
+  |screen -ls|**列出清單** ： 查看目前背景有多少連線在跑|
+  |screen -r [PID or NAME]|**恢復連線** ： **接回** 之前 **Detach** 的連線|
+  |screen -wipe|**清除殘留** ： 清理已經斷開但仍留在清單中的死連線|
+
   - 參數 `-S` 為 Session Name
     - 當同時開啟很多個 screen 工作時，為了方便辨認，可以給它一個名字
     - 當下達 `screen -ls` 時，可以看到所有連線 session 的名稱
