@@ -215,7 +215,29 @@
 |USART1|ISR|狀態**監控**(**唯讀**)|Bit 7 (**TXE**)<br>Bit 5 (**RXNE**)|Bit-7 = `1`: 發送區空 (**可寫資料**)<br>Bit-5 = `1`: 接收區有資料 (**可讀資料**)|
 |USART1|TDR|**發送資料**暫存器|Bits [8:0]|寫入此處 ： 資料由 TX 腳位發出去|
 |USART1|RDR|**接收資料**暫存器|Bits [8:0]|讀取此處 ： 由 RX 腳位接收資料|
-  
+
+### RCC Peripheral
+- #### 位於 AHB1 BUS (P.48)
+  <img width="853" height="604" alt="image" src="https://github.com/user-attachments/assets/30dc49c7-5551-4c6f-838d-136f55ae89d3" />
+- #### 所擁有的 Register
+  <img width="796" height="796" alt="image" src="https://github.com/user-attachments/assets/48e96b6f-ad72-4527-b17d-a3facdc93b27" />
+
+### GIPOA Peripheral
+- #### 位於 AHB2 BUS (P.48)
+  <img width="800" height="218" alt="image" src="https://github.com/user-attachments/assets/b4f3cbbf-f675-4284-916b-8ea127c2f157" />
+- #### 所擁有的 Register
+  <img width="795" height="956" alt="image" src="https://github.com/user-attachments/assets/5b951c7e-f639-4b99-aa3a-5716f81cf6e5" />
+  <img width="796" height="283" alt="image" src="https://github.com/user-attachments/assets/cc2d0705-70ac-4cdb-a73e-856490023967" />
+
+
+### UART1 Peripheral
+- #### 位於 APB BUS (P.49)
+  <img width="802" height="685" alt="image" src="https://github.com/user-attachments/assets/c65e5042-4a15-454e-a4e1-40c11997b0bd" />
+- #### 所擁有的 Register
+  <img width="797" height="741" alt="image" src="https://github.com/user-attachments/assets/9aab3c5c-1c9a-4fff-bf42-0e86a6b031aa" />
+  <img width="796" height="450" alt="image" src="https://github.com/user-attachments/assets/cba2bcf5-8990-4d22-96ac-35f6eccef2be" />
+
+
 ### 程式碼
 ```
 #include "stm32f072xb.h"
