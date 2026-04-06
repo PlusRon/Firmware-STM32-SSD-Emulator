@@ -197,11 +197,11 @@
 ### 核心開發文件
 |查找目標|建議手冊|關鍵章節 (Keywords)|
 |:---:|:---|:---|
-|各周邊 **暫存器位元 (Bit)** 定義|Reference Manual (RM0091)|各周邊(Peripheral) 章節末尾的 **Register description**|
-|**時脈樹 (Clock Tree)** 頻率|Reference Manual (RM0091)|**Reset and clock control (RCC)**/Clock tree、HSI clock|
-|引腳 **複用功能 (AF)** 對照表|Datasheet (DS9826)|Pinouts and pin descriptions / **Alternate functions**|
-|**系統控制** 相關的 **暫存器**|Programming Manual (PM0215)|**System control block (SCB)**/AIRCR|
-|處理器異常與中斷架構|Programming Manual (PM0215)|Exception model / NVIC|
+|各周邊 **暫存器位元 (Bit)** 定義|[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)|各周邊(Peripheral) 章節末尾的 **Register description**|
+|**時脈樹 (Clock Tree)** 頻率|[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)|**Reset and clock control (RCC)**/Clock tree、HSI clock|
+|引腳 **複用功能 (AF)** 對照表|[Datasheet (DS9826)](https://www.st.com/resource/en/datasheet/stm32f072c8.pdf)|Pinouts and pin descriptions / **Alternate functions**|
+|**系統控制** 相關的 **暫存器**|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|**System control block (SCB)**/AIRCR|
+|處理器異常與中斷架構|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|Exception model / NVIC|
 
 ### 各周邊、暫存器、位元 (Bit) 控制
 |周邊|暫存器|控制功能|Bit 位置|設定值與物理意義|
