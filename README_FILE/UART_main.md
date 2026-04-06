@@ -186,7 +186,7 @@
     - 缺 : 遇到鍵盤無法輸入的情況，通常是因為 **硬體流控(Flow Control)** 在背景開啟
       - 建議回到 `minicom -s` 關閉預設流控，或在 **啟動 screen 時增加特定的參數**
 ## 四、硬體環境設置
-Rx 與 Tx **交叉原則**、**共地原則**
+#### Rx 與 Tx **交叉原則**、**共地原則**
 | STM32F072 | USB-to-TTL 模組 | 說明 |
 |:---:|:---:|:---|
 |**GND**|**GND**|提供基準電位，未接會導致訊號判斷失效|
@@ -194,6 +194,15 @@ Rx 與 Tx **交叉原則**、**共地原則**
 |**PA10 (RX)**|**TXD**|電腦資料出口連至晶片入口|
 
 ## 五、韌體實作細節 (Firmware)
+### 核心開發文件
+|查找目標|建議手冊|關鍵章節 (Keywords)|
+|:---|:---|:---|
+|各周邊 **暫存器位元 (Bit)** 定義|Reference Manual (RM0091)|各周邊(Peripheral) 章節末尾的 **Register description**|
+|**時脈樹 (Clock Tree)** 頻率|Reference Manual (RM0091)|**Reset and clock control (RCC)**/Clock tree、HSI clock|
+|引腳 **複用功能 (AF)** 對照表|Datasheet (DS9826)|Pinouts and pin descriptions / **Alternate functions**|
+|處理器異常與中斷架構|Programming Manual (PM0215)|Exception model / NVIC|
+
+
 ```
 #include "stm32f072xb.h"
 
