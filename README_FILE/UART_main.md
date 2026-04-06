@@ -204,7 +204,7 @@
 |處理器異常與中斷架構|Programming Manual (PM0215)|Exception model / NVIC|
 
 ### 各周邊、暫存器、位元 (Bit) 控制
-|周邊 (Peripheral)|暫存器 (Register)|控制功能|Bit(位元)位置|設定值與物理意義|
+|周邊|暫存器|控制功能|Bit 位置|設定值與物理意義|
 |:---:|:---:|:---:|:---|:---|
 |RCC|AHBENR|GPIO周邊供電開關|Bit 17 (IOPAEN)|`1`: 啟動 GPIOA 時脈，GIPOA 周邊暫存器才能運作 (MODER、ODR、AFRH、AFRL 暫存器才能通電做控制)|
 |RCC|APB2ENR|UART周邊供電開關|Bit 14 (USART1EN)|`1`: 啟動 USART1 時脈，才能控制 UART1 周邊(通訊電路開始運作)|
