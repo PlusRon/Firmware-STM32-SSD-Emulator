@@ -196,12 +196,27 @@
 ## 五、韌體實作細節 (Firmware)
 ### 核心開發文件
 |查找目標|建議手冊|關鍵章節 (Keywords)|
-|:---|:---|:---|
+|:---:|:---|:---|
 |各周邊 **暫存器位元 (Bit)** 定義|Reference Manual (RM0091)|各周邊(Peripheral) 章節末尾的 **Register description**|
 |**時脈樹 (Clock Tree)** 頻率|Reference Manual (RM0091)|**Reset and clock control (RCC)**/Clock tree、HSI clock|
 |引腳 **複用功能 (AF)** 對照表|Datasheet (DS9826)|Pinouts and pin descriptions / **Alternate functions**|
 |**系統控制** 相關的 **暫存器**|Programming Manual (PM0215)|**System control block (SCB)**/AIRCR|
 |處理器異常與中斷架構|Programming Manual (PM0215)|Exception model / NVIC|
+
+- #### 各周邊、暫存器、位元 (Bit) 控制
+  |周邊 (Peripheral)|暫存器 (Register)|控制功能|Bit(位元)位置|設定值與物理意義|
+  |:---|:---|:---|:---|:---|
+  |RCC|AHBENR|GPIO周邊 供電開關|Bit 17 (IOPAEN)|`1`: 啟動 GPIOA 時脈，GIPOA 周邊暫存器才能運作 (MODER、ODR、AFRH、AFRL 暫存器才能通電做控制)|
+  |RCC|APB2ENR|UART周邊 供電開關|Bit 14 (USART1EN)|`1`: 啟動 USART1 時脈，才能控制 UART1 周邊(通訊電路開始運作)|
+  |GPIOA|MODER|引腳模式切換|Bits [18:19] (PA9)、Bits [20:21] (PA10)|`10`: 設定為 Alternate Function (複用模式)|
+  |GPIOA|AFRH|複用功能選擇|Bits [7:4] (PA9)、Bits [11:8] (PA10)|`0001`: 指定為 AF0~AF7 中的 AF1 模式 (硬體連通至 USART1)|
+  |USART1|BRR|波特率分頻器|Bits [15:0]|填入計算後的分頻值 (`69`(適用HSI 8M Hz) 或 `417`(適用PLL 48M Hz))|
+  |USART1|CR1|UART1 模組總控制|Bit 0 (UE)、Bit 3 (TE)、Bit 2 (RE)|`1`: 啟動 UART1 模組總開關、`1`: 啟動發送器 (Transmitter)、`1`: 啟動接收器 (Receiver)|
+  |USART1|ISR|狀態監控 (**唯讀**)|Bit 7 (TXE)、Bit 5 (RXNE)|`1`: 發送區空 (**可寫資料**)、`1`: 接收區有資料 (**可讀資料**)|
+  |USART1|TDR|發送資料暫存器|Bits [8:0]|寫入此處：資料由 TX 腳位噴射出去|
+  |USART1|RDR|接收資料暫存器|Bits [8:0]|讀取此處：獲取由 RX 腳位進來的資料|
+  
+
 
 
 ```
