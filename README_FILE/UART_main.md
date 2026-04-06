@@ -203,12 +203,12 @@
 |**系統控制** 相關的 **暫存器**|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|**System control block (SCB)**/AIRCR|
 |處理器異常與中斷架構|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|Exception model / NVIC|
 
-### 各周邊、暫存器、位元 (Bit) 控制
-|周邊|暫存器|控制功能|Bit 位置|設定值與物理意義|
+### 周邊、暫存器、位元 (Bit) 控制
+|周邊|暫存器|控制功能|位元 (Bit) 控制|設定值與物理意義|
 |:---:|:---:|:---:|:---|:---|
 |RCC|AHBENR|GPIO周邊供電開關|Bit 17 (**IOPAEN**)|`1`: 啟動 GPIOA 時脈，GIPOA 周邊暫存器才能運作 <br>(MODER、ODR、AFRH、AFRL 暫存器才能通電做控制)|
 |RCC|APB2ENR|UART周邊供電開關|Bit 14 (**USART1EN**)|`1`: 啟動 USART1 時脈，才能控制 UART1 周邊<br>(通訊電路開始運作)|
-|GPIOA|MODER|引腳模式切換|Bits [18:19] (**PA9**)<br>Bits [20:21] (**PA10**)|`10`: 設定為 Alternate Function (複用模式)|
+|GPIOA|MODER|引腳模式切換|Bits [19:18] (**PA9**)<br>Bits [21:20] (**PA10**)|`10`: 設定為 Alternate Function (複用模式)|
 |GPIOA|AFRH|複用功能選擇|Bits [7:4] (**PA9**)<br>Bits [11:8] (**PA10**)|`0001`: 指定為 **AF0~AF7** 中的 **AF1** 模式 (硬體連通至 USART1)|
 |USART1|BRR|波特率分頻器|Bits [15:0]|填入計算後的分頻值 : <br>`69`(適用HSI 8M Hz)<br>`417`(適用PLL 48M Hz)|
 |USART1|CR1|UART1模組總控制|Bit 0 (**UE**)<br>Bit 3 (**TE**)<br>Bit 2 (**RE**)|Bit-0 = `1`: 啟動 UART1 模組總開關<br>Bit-3 = `1`: 啟動發送器 (Transmitter)<br>Bit-2 = `1`: 啟動接收器 (Receiver)|
@@ -216,9 +216,7 @@
 |USART1|TDR|**發送資料**暫存器|Bits [8:0]|寫入此處 ： 資料由 TX 腳位發出去|
 |USART1|RDR|**接收資料**暫存器|Bits [8:0]|讀取此處 ： 由 RX 腳位接收資料|
   
-
-
-
+### 程式碼
 ```
 #include "stm32f072xb.h"
 
