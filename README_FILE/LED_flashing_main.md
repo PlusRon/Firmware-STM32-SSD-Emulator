@@ -1,4 +1,14 @@
 # LED main() 主程式邏輯
+
+## 一、ODR (Output Data Register) 的 讀取-修改-寫入 (Read-Modify-Write, RMW)
+在中斷頻繁時可能產生 **Race Condition**
+- #### Read-Modify-Write (RMW) 操作
+  - 能同時控制多個外設（如 GPIOA, DMA）， `|=` 能確保只置位第 19 位而不干擾其他配置，直接賦值（=）會意外關閉其他已開啟的時鐘
+  - `GPIOC_ODR ^= (1 << 6)`，使用位元運算子（Bitwise Operators）能精確操作特定腳位，避免覆蓋掉該 Port 其他 15 個腳位的狀態
+- #### `delay()` 函式內部的 `__asm("nop")`
+  - NOP (No Operation) 叫 CPU 原地踏步一個週期
+  - 若沒有這行，編譯器可能會發現 `while(count--)` 什麼都沒做，進而將整個迴圈優化刪除，導致延遲失效
+### 程式碼
 ```
 #include "stm32f072xb.h"
 
@@ -35,15 +45,7 @@ int main(void) {
     return 0;
 }
 ```
-## 一、ODR (Output Data Register) 的 讀取-修改-寫入 (Read-Modify-Write, RMW)
-在中斷頻繁時可能產生 **Race Condition**
-- #### Read-Modify-Write (RMW) 操作
-  - 能同時控制多個外設（如 GPIOA, DMA）， `|=` 能確保只置位第 19 位而不干擾其他配置，直接賦值（=）會意外關閉其他已開啟的時鐘
-  - `GPIOC_ODR ^= (1 << 6)`，使用位元運算子（Bitwise Operators）能精確操作特定腳位，避免覆蓋掉該 Port 其他 15 個腳位的狀態
-- #### `delay()` 函式內部的 `__asm("nop")`
-  - NOP (No Operation) 叫 CPU 原地踏步一個週期
-  - 若沒有這行，編譯器可能會發現 `while(count--)` 什麼都沒做，進而將整個迴圈優化刪除，導致延遲失效
- 
+
 ## 二、 BSRR (Bit Set Reset Register) 的 寫入即觸發 (Write-only to trigger)
 - **原子操作 (Atomic Operation)** : 高頻中斷或多工環境下，改用 BSRR (Bit Set Reset Register)，可達成 **寫入即觸發 (Write-only to trigger)**
     - 低 16 位為 SET 操作 : **寫 1** 到 低 16 位，對應 **Pin 變高**
@@ -61,6 +63,7 @@ int main(void) {
   - 或是讀取 ODR 的當前值來判斷
 - 優先權機制
   - 根據手冊，如果同時在 BS6 與 BR6 寫入 1，**BS6 (Set) 具有優先權**（視型號而定），進一步定義了硬體在極端衝突下的預期行為
+### 程式碼
 ```
 int main(void) {
     /* 1. 開啟時鐘與設定 PC6 為輸出 (與之前相同) */
