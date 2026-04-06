@@ -200,6 +200,7 @@
 |各周邊 **暫存器位元 (Bit)** 定義|Reference Manual (RM0091)|各周邊(Peripheral) 章節末尾的 **Register description**|
 |**時脈樹 (Clock Tree)** 頻率|Reference Manual (RM0091)|**Reset and clock control (RCC)**/Clock tree、HSI clock|
 |引腳 **複用功能 (AF)** 對照表|Datasheet (DS9826)|Pinouts and pin descriptions / **Alternate functions**|
+|**系統控制** 相關的 **暫存器**|Programming Manual (PM0215)|**System control block (SCB)**/AIRCR|
 |處理器異常與中斷架構|Programming Manual (PM0215)|Exception model / NVIC|
 
 
