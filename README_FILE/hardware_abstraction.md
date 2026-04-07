@@ -176,20 +176,21 @@ typedef struct {
     __I  uint32_t CALIB;
 } SysTick_TypeDef;
 
+
 /* DMA Channel Structure */
 typedef struct {
-    __IO uint32_t CCR;
-    __IO uint32_t CNDTR;
-    __IO uint32_t CPAR;
-    __IO uint32_t CMAR;
+    __IO uint32_t CCR;    /* 0x00: Configuration register */
+    __IO uint32_t CNDTR;  /* 0x04: Number of data register */
+    __IO uint32_t CPAR;   /* 0x08: Peripheral address register */
+    __IO uint32_t CMAR;   /* 0x0C: Memory address register */
+    uint32_t RESERVED;    /* 0x10: 每個 Channel 之間有 4-byte 的間隔 */
 } DMA_Channel_TypeDef;
 
 typedef struct {
-    __IO uint32_t ISR;
-    __IO uint32_t IFCR;
-    DMA_Channel_TypeDef CH[7]; // STM32F0 has 7 channels
+    __IO uint32_t ISR;    /* 0x00: Interrupt status register */
+    __IO uint32_t IFCR;   /* 0x04: Interrupt flag clear register */
+    DMA_Channel_TypeDef CH[7]; /* 從 0x08 開始對應各個通道 */
 } DMA_TypeDef;
-
 
 /* -------------------------------------------------------------------------
  * 2. Peripheral Base Addresses
