@@ -92,8 +92,13 @@ void System_Init(void) {
 
     /* 3. UART GPIO 設定 (PA9=TX, PA10=RX, 使用 AF1) */
     GPIOA->MODER &= ~((3UL << 18) | (3UL << 20));
-    GPIOA->MODER |=  ((2UL << 18) | (2UL << 20)); 
-    GPIOA->AFR[1] |= ((1UL << 4) | (1UL << 8));
+    GPIOA->MODER |=  ((2UL << 18) | (2UL << 20));
+    /* --- 修正處 --- */
+    // 因為 PA9 與 PA10 屬於 Pin 8~15，所以對應 AFRH (Alternate Function High register)
+    // 每個 Pin 佔用 4 bits，PA9 是第 4~7 位，PA10 是第 8~11 位
+    // 寫入 1UL (AF1) 代表選擇 USART1 功能
+    GPIOA->AFRH &= ~((0xFUL << 4) | (0xFUL << 8)); // 先清空對應位元
+    GPIOA->AFRH |=  ((1UL << 4) | (1UL << 8));    // 設定為 AF1 (USART1)
 
     /* 4. DMA 設定 (USART1_RX 固定對應 DMA1 Channel 3) */
     DMA1->CH[2].CPAR = (uint32_t)&(USART1->RDR); // 來源位址
