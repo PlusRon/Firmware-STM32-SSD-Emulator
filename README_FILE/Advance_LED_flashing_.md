@@ -22,39 +22,77 @@
 ```
 #include "stm32f072xb.h"
 
+/* --- 全域變數與計時器相關 --- */
+volatile uint32_t msTicks = 0; 
+
+void SysTick_Handler(void) {
+    msTicks++;
+}
+
+void SysTick_Init(uint32_t ticks) {
+    SysTick->LOAD = (uint32_t)(ticks - 1UL);
+    SysTick->VAL = 0UL;
+    SysTick->CTRL = (1UL << 2) | (1UL << 1) | (1UL << 0);
+}
+
+uint32_t get_tick(void) {
+    return msTicks;
+}
+
+/* --- LED 模組化區段 --- */
+
 /**
- * @brief simple delay function
- * Use __asm("nop") to prevent the compiler from optimizing away null-loop
+ * @brief 初始化 LED 相關硬體 (PC6)
  */
-void delay(int32_t count) {
-    while (count--) {
-        __asm("nop");
-    }
+void LED_Init(void) {
+    /* 1. 開啟 GPIOC 時鐘 (Bit 19) */
+    RCC->AHBENR |= (1UL << 19);
+    
+    /* 2. 設定 PC6 為輸出模式 (MODER6[1:0] = 01) */
+    GPIOC->MODER &= ~(3UL << 12); // 先清零第 12, 13 位元
+    GPIOC->MODER |=  (1UL << 12); // 設定為 01 (General purpose output mode)
 }
 
 /**
- * @brief Entry of main
+ * @brief 翻轉 LED 狀態 (使用 BSRR 確保原子性操作)
+ * @param state 指向目前 LED 狀態變數的指標
  */
-int main(void) {
-    /* 1. 開啟時鐘與設定 PC6 為輸出 (與之前相同) */
-    RCC->AHBENR |= (1UL << 19);
-    GPIOC->MODER &= ~(3UL << 12);
-    GPIOC->MODER |= (1UL << 12);
+void LED_Toggle(uint8_t *state) {
+    if (*state == 0) {
+        /* Set PC6 (High) -> 寫入 BSRR 第 6 位元 */
+        GPIOC->BSRR = (1UL << 6);
+        *state = 1;
+    } else {
+        /* Reset PC6 (Low) -> 寫入 BSRR 第 22 位元 (6 + 16) */
+        GPIOC->BSRR = (1UL << 22);
+        *state = 0;
+    }
+}
 
-    uint8_t led_state = 0; // 軟體追蹤狀態
+/* --- 主程式 --- */
+
+int main(void) {
+    /* 初始化階段 */
+    LED_Init();
+    SysTick_Init(8000); // 1ms @ 8MHz
+
+    uint32_t last_blink = 0;
+    uint8_t led_current_state = 0;
 
     while (1) {
-        if (led_state == 0) {
-            /* 使用 BSRR 置位 (Set) PC6 : 寫入第 6 位元 */
-            GPIOC->BSRR = (1UL << 6); 
-            led_state = 1;
-        } else {
-            /* 使用 BSRR 復位 (Reset) PC6 : 寫入第 6 + 16 = 22 位元 */
-            GPIOC->BSRR = (1UL << 22); 
-            led_state = 0;
+        /* 非阻塞判斷：每 500ms 執行一次 */
+        if ((get_tick() - last_blink) >= 500) {
+            
+            // 使用模組化函式翻轉 LED
+            LED_Toggle(&led_current_state);
+            
+            last_blink = get_tick();
         }
 
-        delay(100000);
+        /* 這裡可以放其他的非阻塞任務，例如：
+           UART_Check_Status(); 
+           DMA_Transfer_Monitor();
+        */
     }
 }
 ```
