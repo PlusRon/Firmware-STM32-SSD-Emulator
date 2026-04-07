@@ -176,6 +176,20 @@ typedef struct {
     __I  uint32_t CALIB;
 } SysTick_TypeDef;
 
+/* DMA Channel Structure */
+typedef struct {
+    __IO uint32_t CCR;
+    __IO uint32_t CNDTR;
+    __IO uint32_t CPAR;
+    __IO uint32_t CMAR;
+} DMA_Channel_TypeDef;
+
+typedef struct {
+    __IO uint32_t ISR;
+    __IO uint32_t IFCR;
+    DMA_Channel_TypeDef CH[7]; // STM32F0 has 7 channels
+} DMA_TypeDef;
+
 
 /* -------------------------------------------------------------------------
  * 2. Peripheral Base Addresses
@@ -184,6 +198,8 @@ typedef struct {
 #define GPIOA_BASE    (0x48000000UL)  // start of AHB2 
 #define GPIOC_BASE    (0x48000800UL)
 #define USART1_BASE   (0x40013800UL)  // from APB2
+#define NVIC_BASE     (0xE000E100UL)
+#define DMA1_BASE     (0x40020000UL)
 
 
 /* Convert the address to struct pointer (Mapping) */
@@ -191,8 +207,9 @@ typedef struct {
 #define GPIOA       ((GPIO_TypeDef *) GPIOA_BASE)
 #define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)        /* AHB2-Bus-Base(0x4800 0000) + GPIOC-Peripheral-offest(0x4800 0800) */
 #define USART1      ((USART_TypeDef *) USART1_BASE)
-#define SysTick     ((SysTick_TypeDef *) 0xE000E010)     /* PM0215 : STM32 core peripheral register regions*/
-
+#define SysTick     ((SysTick_TypeDef *) 0xE000E010UL)     /* PM0215 : STM32 core peripheral register regions*/
+#define DMA1        ((DMA_TypeDef *) DMA1_BASE)
+#define NVIC_ISER   ((__IO uint32_t *) 0xE000E100UL)
 
 #endif /* STM32F072XB_H */
 ```
