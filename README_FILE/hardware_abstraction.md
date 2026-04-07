@@ -1,3 +1,108 @@
+---
+```
+#ifndef STM32F072XB_H
+#define STM32F072XB_H
+
+#include <stdint.h>
+
+/* 定義存取權限 */
+#define __I  volatile const
+#define __O  volatile
+#define __IO volatile
+
+/* 基底位址定義 */
+#define PERIPH_BASE         0x40000000UL
+#define AHBPERIPH_BASE      (PERIPH_BASE + 0x00020000UL)
+#define APB2PERIPH_BASE     (PERIPH_BASE + 0x00010000UL)
+
+/* 周邊位址映射 */
+#define RCC_BASE            (AHBPERIPH_BASE + 0x1000UL)
+#define GPIOA_BASE          (AHBPERIPH_BASE + 0x0000UL)
+#define GPIOC_BASE          (AHBPERIPH_BASE + 0x0800UL)
+#define DMA1_BASE           (AHBPERIPH_BASE + 0x0000UL)
+#define USART1_BASE         (APB2PERIPH_BASE + 0x3800UL)
+
+/* 核心周邊位址 */
+#define SCS_BASE            0xE000E000UL
+#define SysTick_BASE        (SCS_BASE + 0x0010UL)
+
+/* --- 結構體定義 --- */
+
+typedef struct {
+    __IO uint32_t CR;
+    __IO uint32_t CFGR;
+    __IO uint32_t CIR;
+    __IO uint32_t APB2RSTR;
+    __IO uint32_t APB1RSTR;
+    __IO uint32_t AHBENR;
+    __IO uint32_t APB2ENR;
+    __IO uint32_t APB1ENR;
+    __IO uint32_t BDCR;
+    __IO uint32_t CSR;
+    __IO uint32_t AHBRSTR;
+    __IO uint32_t CFGR2;
+    __IO uint32_t CFGR3;
+} RCC_TypeDef;
+
+typedef struct {
+    __IO uint32_t MODER;
+    __IO uint32_t OTYPER;
+    __IO uint32_t OSPEEDR;
+    __IO uint32_t PUPDR;
+    __IO uint32_t IDR;
+    __IO uint32_t ODR;
+    __IO uint32_t BSRR;
+    __IO uint32_t LCKR;
+    __IO uint32_t AFRL;
+    __IO uint32_t AFRH;
+} GPIO_TypeDef;
+
+typedef struct {
+    __IO uint32_t CR1;
+    __IO uint32_t CR2;
+    __IO uint32_t CR3;
+    __IO uint32_t BRR;
+    __IO uint32_t GTPR;
+    __IO uint32_t RTOR;
+    __IO uint32_t RQR;
+    __IO uint32_t ISR;
+    __IO uint32_t ICR;
+    __IO uint32_t RDR;
+    __IO uint32_t TDR;
+} USART_TypeDef;
+
+typedef struct {
+    __IO uint32_t CCR;
+    __IO uint32_t CNDTR;
+    __IO uint32_t CPAR;
+    __IO uint32_t CMAR;
+} DMA_Channel_TypeDef;
+
+typedef struct {
+    __IO uint32_t ISR;
+    __IO uint32_t IFCR;
+    DMA_Channel_TypeDef CH[7];
+} DMA_TypeDef;
+
+typedef struct {
+    __IO uint32_t CTRL;
+    __IO uint32_t LOAD;
+    __IO uint32_t VAL;
+    __I  uint32_t CALIB;
+} SysTick_TypeDef;
+
+/* 指標定義 */
+#define RCC     ((RCC_TypeDef *) RCC_BASE)
+#define GPIOA   ((GPIO_TypeDef *) GPIOA_BASE)
+#define GPIOC   ((GPIO_TypeDef *) GPIOC_BASE)
+#define USART1  ((USART_TypeDef *) USART1_BASE)
+#define DMA1    ((DMA_TypeDef *) DMA1_BASE)
+#define SysTick ((SysTick_TypeDef *) SysTick_BASE)
+
+#endif
+```
+
+
 # 標頭檔 `stm32f072xb.h` 之 硬體抽象層設計 (Hardware Abstraction Layer, HAL)
 在嵌入式開發中，不直接操作雜亂的記憶體位址，而是透過 **結構體映射 (Struct Mapping)** 技術建立一套可讀性高、且符合工業標準（如 CMSIS）的抽象層
 ```
@@ -6,59 +111,78 @@
 
 #include <stdint.h>
 
+/* 定義存取權限 */
+#define __I  volatile const
+#define __O  volatile
+#define __IO volatile
+
+
 /* -------------------------------------------------------------------------
  * 1. Define Register Structures
  * ------------------------------------------------------------------------- */
 
+/* RCC Register Structures (Reset and Clock Gating Control) */
+typedef struct {
+    __IO uint32_t CR;        /* 0x00: Clock Control */
+    __IO uint32_t CFGR;      /* 0x04: Clock Configuration */
+    __IO uint32_t CIR;       /* 0x08: Interrupt */
+    __IO uint32_t APB2RSTR;  /* 0x0C: APB2 Reset */
+    __IO uint32_t APB1RSTR;  /* 0x10: APB1 Reset */
+    __IO uint32_t AHBENR;    /* 0x14: AHB Peripheral Clock Enable */
+    __IO uint32_t APB2ENR;   /* 0x18: APB2 Peripheral Clock Enable */
+    __IO uint32_t APB1ENR;   /* 0x1C: APB1 Peripheral Clock Enable */
+    __IO uint32_t BDCR;
+    __IO uint32_t CSR;
+    __IO uint32_t AHBRSTR;
+    __IO uint32_t CFGR2;
+    __IO uint32_t CFGR3;
+} RCC_TypeDef;
+
+
 /* GPIO Register Structures (4-bytes Implicit-Offset for each member of struct) */
 typedef struct {
-    volatile uint32_t MODER;    /* 0x00: Mode */
-    volatile uint32_t OTYPER;   /* 0x04: Output Type */
-    volatile uint32_t OSPEEDR;  /* 0x08: Output Speed */
-    volatile uint32_t PUPDR;    /* 0x0C: Pull-up/Pull-down */
-    volatile uint32_t IDR;      /* 0x10: Input Date */
-    volatile uint32_t ODR;      /* 0x14: Output Data */
-    volatile uint32_t BSRR;     /* 0x18: bit set/reset */
-    volatile uint32_t LCKR;     /* 0x1C: Configuration Lock */
-    volatile uint32_t AFRL;     /* 0x20: Function reuse Low-bit */
-    volatile uint32_t AFRH;     /* 0x24: Function reuse High-bit */
+    __IO uint32_t MODER;    /* 0x00: Mode */
+    __IO uint32_t OTYPER;   /* 0x04: Output Type */
+    __IO uint32_t OSPEEDR;  /* 0x08: Output Speed */
+    __IO uint32_t PUPDR;    /* 0x0C: Pull-up/Pull-down */
+    __IO uint32_t IDR;      /* 0x10: Input Date */
+    __IO uint32_t ODR;      /* 0x14: Output Data */
+    __IO uint32_t BSRR;     /* 0x18: bit set/reset */
+    __IO uint32_t LCKR;     /* 0x1C: Configuration Lock */
+    __IO uint32_t AFRL;     /* 0x20: Function reuse Low-bit */
+    __IO uint32_t AFRH;     /* 0x24: Function reuse High-bit */
 } GPIO_TypeDef;
 
 
 /* USART Register Structures */
 typedef struct {
-    volatile uint32_t CR1;      /* 0x00: Control register 1 */
-    volatile uint32_t CR2;      /* 0x04: Control register 2 */
-    volatile uint32_t CR3;      /* 0x08: Control register 3 */
-    volatile uint32_t BRR;      /* 0x0C: Baud rate register */
-    volatile uint32_t GTPR;     /* 0x10: Guard time and prescaler */
-    volatile uint32_t RTOR;     /* 0x14: Receiver timeout */
-    volatile uint32_t RQR;      /* 0x18: Request register */
-    volatile uint32_t ISR;      /* 0x1C: Interrupt and status */
-    volatile uint32_t ICR;      /* 0x20: Interrupt flag clear */
-    volatile uint32_t RDR;      /* 0x24: Receive data */
-    volatile uint32_t TDR;      /* 0x28: Transmit data */
+    __IO uint32_t CR1;      /* 0x00: Control register 1 */
+    __IO uint32_t CR2;      /* 0x04: Control register 2 */
+    __IO uint32_t CR3;      /* 0x08: Control register 3 */
+    __IO uint32_t BRR;      /* 0x0C: Baud rate register */
+    __IO uint32_t GTPR;     /* 0x10: Guard time and prescaler */
+    __IO uint32_t RTOR;     /* 0x14: Receiver timeout */
+    __IO uint32_t RQR;      /* 0x18: Request register */
+    __IO uint32_t ISR;      /* 0x1C: Interrupt and status */
+    __IO uint32_t ICR;      /* 0x20: Interrupt flag clear */
+    __IO uint32_t RDR;      /* 0x24: Receive data */
+    __IO uint32_t TDR;      /* 0x28: Transmit data */
 } USART_TypeDef;
 
-
-/* RCC Register Structures (Reset and Clock Gating Control) */
 typedef struct {
-    volatile uint32_t CR;        /* 0x00: Clock Control */
-    volatile uint32_t CFGR;      /* 0x04: Clock Configuration */
-    volatile uint32_t CIR;       /* 0x08: Interrupt */
-    volatile uint32_t APB2RSTR;  /* 0x0C: APB2 Reset */
-    volatile uint32_t APB1RSTR;  /* 0x10: APB1 Reset */
-    volatile uint32_t AHBENR;    /* 0x14: AHB Peripheral Clock Enable */
-    volatile uint32_t APB2ENR;   /* 0x18: APB2 Peripheral Clock Enable */
-    volatile uint32_t APB1ENR;   /* 0x1C: APB1 Peripheral Clock Enable */
-} RCC_TypeDef;
+    __IO uint32_t CTRL;
+    __IO uint32_t LOAD;
+    __IO uint32_t VAL;
+    __I  uint32_t CALIB;
+} SysTick_TypeDef;
+
 
 /* -------------------------------------------------------------------------
  * 2. Peripheral Base Addresses
  * ------------------------------------------------------------------------- */
-#define RCC_BASE    (0x40021000UL)
+#define RCC_BASE      (0x40021000UL)
 #define GPIOA_BASE    (0x48000000UL)  // start of AHB2 
-#define GPIOC_BASE  (0x48000800UL)
+#define GPIOC_BASE    (0x48000800UL)
 #define USART1_BASE   (0x40013800UL)  // from APB2
 
 
@@ -67,6 +191,8 @@ typedef struct {
 #define GPIOA       ((GPIO_TypeDef *)  GPIOA_BASE)
 #define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)        /* AHB2-Bus-Base(0x4800 0000) + GPIOC-Peripheral-offest(0x4800 0800) */
 #define USART1      ((USART_TypeDef *) USART1_BASE)
+#define SysTick     ((SysTick_TypeDef *) 0xE000E010)     /* PM0215 : STM32 core peripheral register regions*/
+
 
 #endif /* STM32F072XB_H */
 ```
