@@ -187,11 +187,11 @@ typedef struct {
 
 
 /* Convert the address to struct pointer (Mapping) */
-#define RCC         ((RCC_TypeDef *)  RCC_BASE)          /* AHB1-Bus-Base(0x4002 0000) + RCC-Peripheral-offset(0x4002 1000) */
-#define GPIOA       ((GPIO_TypeDef *)  GPIOA_BASE)
-#define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)        /* AHB2-Bus-Base(0x4800 0000) + GPIOC-Peripheral-offest(0x4800 0800) */
-#define USART1      ((USART_TypeDef *) USART1_BASE)
-#define SysTick     ((SysTick_TypeDef *) 0xE000E010)     /* PM0215 : STM32 core peripheral register regions*/
+#define RCC         ((RCC_TypeDef *)      RCC_BASE)          /* AHB1-Bus-Base(0x4002 0000) + RCC-Peripheral-offset(0x4002 1000) */
+#define GPIOA       ((GPIO_TypeDef *)     GPIOA_BASE)
+#define GPIOC       ((GPIO_TypeDef *)     GPIOC_BASE)        /* AHB2-Bus-Base(0x4800 0000) + GPIOC-Peripheral-offest(0x4800 0800) */
+#define USART1      ((USART_TypeDef *)    USART1_BASE)
+#define SysTick     ((SysTick_TypeDef *)  0xE000E010)        /* PM0215 : STM32 core peripheral register regions*/
 
 
 #endif /* STM32F072XB_H */
