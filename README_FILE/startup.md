@@ -4,6 +4,8 @@
 
 /* import the defined-symbol(external variable) from linker_script.ld */
 /* Notice： they are the address-label, use their address in C-langue */
+extern uint32_t _estack;   // 堆疊頂端位址
+extern uint32_t _la_data;  // .data 在 FLASH 中的載入位址 (LMA)
 extern uint32_t _etext;   // In Flash, be the start-point of .data for LMA
 extern uint32_t _sdata;   // In RAM, be the start-point of .data for VMA
 extern uint32_t _edata;   // In RAM, be the end-point of .data
@@ -13,6 +15,16 @@ extern uint32_t _ebss;    // In RAM, be the end-point of .bss
 /* declare the external main function */
 extern int main(void);
 
+/* 3. 定義預設中斷處理器 (保險絲) */
+void Default_Handler(void) {
+    while (1);
+}
+
+/* 4. 使用 Weak Alias 宣告中斷，增加相容性 */
+/* 這樣你在 main.c 寫了同名函式，這裡就會被自動取代 */
+void Reset_Handler(void);
+void SysTick_Handler(void)    __attribute__ ((weak, alias ("Default_Handler")));
+void USART1_IRQHandler(void)  __attribute__ ((weak, alias ("Default_Handler")));
 
 /* A function that force trigger software reset (using the kernel registers of ARM Cortex-M) */
 void system_soft_reset(void) {
@@ -29,7 +41,9 @@ void Reset_Handler(void) {
 
     // 1. move .data-section : copy initial-global-variable from Flash to RAM
     // Ex : int count = 100; this 100 have to copy from FLASH to RAM, then program to be read/write correctly
-    uint32_t *src = &_etext;   // LMA
+    // uint32_t *src = &_etext;   // LMA
+    // A. 搬運 .data 段：從 FLASH (LMA) 搬到 RAM (VMA)
+    uint32_t *src = &_la_data;
     uint32_t *dest = &_sdata;  // VMA
 
     while (dest < &_edata) {
@@ -74,8 +88,44 @@ uint32_t vector_table[] = {
 ```
 __attribute__ ((section(".isr_vector")))   // 確保下方表格精確擺放在 Linker Script 指定的 .isr_vector 區段
 uint32_t vector_table[] = {
-    0x20004000,                            // 0. 初始堆疊指標 (MSP): RAM 頂端 (16KB)
-    (uint32_t)Reset_Handler                // 1. Reset 向量：CPU 開機後的跳轉起點
+    (uint32_t)&_estack,                            // 0. 初始堆疊指標 (MSP): RAM 頂端 (16KB)
+    (uint32_t)Reset_Handler,                // 1. Reset 向量：CPU 開機後的跳轉起點
+    (uint32_t)Default_Handler,  // 2. NMI
+    (uint32_t)Default_Handler,  // 3. HardFault
+    0, 0, 0, 0, 0, 0, 0,        // 4-10. 保留
+    (uint32_t)Default_Handler,  // 11. SVCall
+    0, 0,                       // 12-13. 保留
+    (uint32_t)Default_Handler,  // 14. PendSV
+    (uint32_t)SysTick_Handler,  // 15. SysTick (非阻塞計時核心)
+    /* 外設中斷 (按硬體手冊 IRQ 順序排列) */
+    (uint32_t)Default_Handler,  // 16. WWDG (IRQ 0)
+    (uint32_t)Default_Handler,  // 17. PVD
+    (uint32_t)Default_Handler,  // 18. RTC
+    (uint32_t)Default_Handler,  // 19. FLASH
+    (uint32_t)Default_Handler,  // 20. RCC
+    (uint32_t)Default_Handler,  // 21. EXTI0_1
+    (uint32_t)Default_Handler,  // 22. EXTI2_3
+    (uint32_t)Default_Handler,  // 23. EXTI4_15
+    (uint32_t)Default_Handler,  // 24. TSC
+    (uint32_t)Default_Handler,  // 25. DMA_CH1
+    (uint32_t)Default_Handler,  // 26. DMA_CH2_3
+    (uint32_t)Default_Handler,  // 27. DMA_CH4_5
+    (uint32_t)Default_Handler,  // 28. ADC1_COMP
+    (uint32_t)Default_Handler,  // 29. TIM1_BRK_UP_TRG_COM
+    (uint32_t)Default_Handler,  // 30. TIM1_CC
+    (uint32_t)Default_Handler,  // 31. TIM2
+    (uint32_t)Default_Handler,  // 32. TIM3
+    (uint32_t)Default_Handler,  // 33. TIM6_DAC
+    (uint32_t)Default_Handler,  // 34. TIM7
+    (uint32_t)Default_Handler,  // 35. TIM14
+    (uint32_t)Default_Handler,  // 36. TIM15
+    (uint32_t)Default_Handler,  // 37. TIM16
+    (uint32_t)Default_Handler,  // 38. TIM17
+    (uint32_t)Default_Handler,  // 39. I2C1
+    (uint32_t)Default_Handler,  // 40. I2C2
+    (uint32_t)Default_Handler,  // 41. SPI1
+    (uint32_t)Default_Handler,  // 42. SPI2
+    (uint32_t)USART1_IRQHandler // 43. USART1 (STM32F072 的 IRQ 27)
 };
 ```
 ## 二、實作 Reset_Handler ： 資料搬家與環境初始化
