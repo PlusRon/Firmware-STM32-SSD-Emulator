@@ -110,7 +110,8 @@ void System_Init(void) {
 
     /* 6. NVIC 設定：開啟 USART1 中斷 (IRQ 27) */
     // 注意：*NVIC_ISER 指向的是中斷使能暫存器位址
-    *((volatile uint32_t *)0xE000E100UL) = (1UL << 27);
+    // *((volatile uint32_t *)0xE000E100UL) = (1UL << 27);
+    *NVIC_ISER = (1UL << 27);
 
     /* 7. SysTick 設定 (1ms @ 8MHz) */
     SysTick->LOAD = 8000 - 1;
