@@ -6,7 +6,7 @@
 /* Notice： they are the address-label, use their address in C-langue */
 extern uint32_t _estack;   // 堆疊頂端位址
 extern uint32_t _la_data;  // .data 在 FLASH 中的載入位址 (LMA)
-extern uint32_t _etext;   // In Flash, be the start-point of .data for LMA
+// extern uint32_t _etext;   // In Flash, be the start-point of .data for LMA
 extern uint32_t _sdata;   // In RAM, be the start-point of .data for VMA
 extern uint32_t _edata;   // In RAM, be the end-point of .data
 extern uint32_t _sbss;    // In RAM, be the start-point of .bss
