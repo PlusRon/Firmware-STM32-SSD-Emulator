@@ -91,7 +91,7 @@ void System_Init(void) {
     DMA1->CH[2].CCR = (1UL << 7) | (1UL << 5) | (1UL << 0);
 
     /* 5. UART 參數設定 */
-    USART1->BRR = 833; 
+    USART1->BRR = 69; 
     USART1->CR1 = (1UL << 0) | (1UL << 3) | (1UL << 2) | (1UL << 4); // UE, TE, RE, IDLEIE
     USART1->CR3 = (1UL << 6); // DMAR (使能 DMA 請求)
 
@@ -259,7 +259,7 @@ void System_Init(void) {
     DMA1->CH[2].CCR = (1UL << 7) | (1UL << 0);   // MINC=1, EN=1
 
     /* 5. UART 參數設定 (9600 Baud @ 8MHz) */
-    USART1->BRR = 833; 
+    USART1->BRR = 69; 
     // CR1: 開啟 UE, TE, RE 並啟動 IDLEIE (空閒中斷)
     USART1->CR1 = (1UL << 0) | (1UL << 3) | (1UL << 2) | (1UL << 4);
     // CR3: 開啟 DMAR (使能 UART 請求 DMA)
