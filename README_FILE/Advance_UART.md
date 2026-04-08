@@ -6,6 +6,158 @@
 
 /* --- 全域變數 --- */
 volatile uint32_t msTicks = 0;           // SysTick 計數
+uint8_t rx_buffer[RX_BUF_SIZE];          // DMA Ring Buffer
+uint16_t rd_ptr = 0;                     // 軟體讀取指標 (Read Pointer)
+volatile uint8_t rx_event = 0;           // 接收事件旗標 (由 IDLE 觸發)
+
+/* --- 系統與計時相關 --- */
+
+void SysTick_Handler(void) {
+    msTicks++;
+}
+
+/**
+ * @brief 取得系統啟動後的毫秒數
+ */
+uint32_t get_tick(void) {
+    return msTicks;
+}
+
+/* --- LED 模組化區段 --- */
+
+void LED_Init(void) {
+    /* 開啟 GPIOC 時鐘 */
+    RCC->AHBENR |= (1UL << 19);
+    
+    /* 設定 PC6 為輸出模式 */
+    GPIOC->MODER &= ~(3UL << 12);
+    GPIOC->MODER |=  (1UL << 12);
+}
+
+void LED_Toggle(uint8_t *state) {
+    if (*state == 0) {
+        GPIOC->BSRR = (1UL << 6);
+        *state = 1;
+    } else {
+        GPIOC->BSRR = (1UL << 22);
+        *state = 0;
+    }
+}
+
+/* --- UART 與 DMA 處理區段 --- */
+
+/**
+ * @brief USART1 中斷處理：捕捉 IDLE Line
+ * 在 Ring Buffer 模式下，我們不關閉 DMA，只標記有資料進來。
+ */
+void USART1_IRQHandler(void) {
+    if (USART1->ISR & (1UL << 4)) {
+        USART1->ICR = (1UL << 4);       // 清除 IDLE 旗標
+        rx_event = 1;                   // 通知主迴圈處理資料
+    }
+}
+
+void UART_Send(char *s) {
+    while (*s) {
+        while (!(USART1->ISR & (1UL << 7)));
+        USART1->TDR = *s++;
+    }
+}
+
+/* --- 系統初始化整合 --- */
+
+void System_Init(void) {
+    /* 1. 時鐘開啟 */
+    RCC->AHBENR |= (1UL << 17) | (1UL << 19) | (1UL << 0);
+    RCC->APB2ENR |= (1UL << 14);
+
+    /* 2. LED 初始化 */
+    LED_Init();
+
+    /* 3. UART GPIO 設定 (PA9, PA10) */
+    GPIOA->MODER &= ~((3UL << 18) | (3UL << 20));
+    GPIOA->MODER |=  ((2UL << 18) | (2UL << 20));
+    GPIOA->AFRH &= ~((0xFUL << 4) | (0xFUL << 8));
+    GPIOA->AFRH |=  ((1UL << 4) | (1UL << 8));
+
+    /* 4. DMA 設定 (關鍵修改：開啟 CIRC 循環模式) */
+    DMA1->CH[2].CPAR = (uint32_t)&(USART1->RDR);
+    DMA1->CH[2].CMAR = (uint32_t)rx_buffer;
+    DMA1->CH[2].CNDTR = RX_BUF_SIZE;
+    /* Bit 7: MINC (記憶體遞增)
+       Bit 5: CIRC (循環模式 - Ring Buffer 核心)
+       Bit 0: EN (開啟)
+    */
+    DMA1->CH[2].CCR = (1UL << 7) | (1UL << 5) | (1UL << 0);
+
+    /* 5. UART 參數設定 */
+    USART1->BRR = 833; 
+    USART1->CR1 = (1UL << 0) | (1UL << 3) | (1UL << 2) | (1UL << 4); // UE, TE, RE, IDLEIE
+    USART1->CR3 = (1UL << 6); // DMAR (使能 DMA 請求)
+
+    /* 6. NVIC 開啟 USART1 中斷 */
+    *NVIC_ISER = (1UL << 27);
+
+    /* 7. SysTick 設定 (1ms) */
+    SysTick->LOAD = 8000 - 1;
+    SysTick->VAL = 0;
+    SysTick->CTRL = 7;
+}
+
+/* --- 主程式執行 --- */
+
+int main(void) {
+    System_Init();
+
+    uint32_t last_blink = 0;
+    uint8_t led_current_state = 0;
+
+    UART_Send("Advanced DMA Ring-Buffer System Initialized\r\n");
+
+    while (1) {
+        /* 任務 1：非阻塞 LED 閃爍 */
+        if ((get_tick() - last_blink) >= 500) {
+            LED_Toggle(&led_current_state);
+            last_blink = get_tick();
+        }
+
+        /* 任務 2：Ring Buffer 接收處理 */
+        // 當偵測到 IDLE (一串資料傳完) 或 緩衝區有新資料時進入
+        uint16_t wr_ptr = RX_BUF_SIZE - DMA1->CH[2].CNDTR; // 獲取硬體當前寫入位置
+
+        if (rx_event || (rd_ptr != wr_ptr)) {
+            if (rd_ptr != wr_ptr) {
+                UART_Send("Recv: ");
+                
+                // 從讀取指標 (rd_ptr) 一直讀到 寫入指標 (wr_ptr)
+                while (rd_ptr != wr_ptr) {
+                    // 等待 UART 傳送暫存器空
+                    while (!(USART1->ISR & (1UL << 7)));
+                    USART1->TDR = rx_buffer[rd_ptr];
+
+                    // 移動讀取指標，並在到達緩衝區末尾時自動繞回
+                    rd_ptr++;
+                    if (rd_ptr >= RX_BUF_SIZE) {
+                        rd_ptr = 0;
+                    }
+                }
+                UART_Send("\r\n");
+            }
+            rx_event = 0; // 重置事件標記
+        }
+    }
+}
+```
+
+
+```
+#include "stm32f072xb.h"
+
+/* --- 巨集定義 --- */
+#define RX_BUF_SIZE 128
+
+/* --- 全域變數 --- */
+volatile uint32_t msTicks = 0;           // SysTick 計數
 uint8_t rx_buffer[RX_BUF_SIZE];          // DMA 接收緩衝區
 volatile uint16_t rx_data_len = 0;       // 接收到的資料長度
 volatile uint8_t rx_ready = 0;           // 接收完成旗標
