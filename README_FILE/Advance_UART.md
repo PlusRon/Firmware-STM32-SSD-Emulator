@@ -1,4 +1,15 @@
 ### 程式碼 : UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection
+- 一般 Ring Buffer判斷，rd_ptr 和 wr_ptr 再次相等時，是如何分辨緩衝區是「空的」還是「被塞滿一圈」?
+  - 常用的做法 : 緩衝區永遠不能真正裝滿，必須保留一個位置
+    - 空的定義：rd_ptr == wr_ptr
+    - 滿的定義：(wr_ptr + 1) % RX_BUF_SIZE == rd_ptr
+    - 如果你宣告了 128 bytes，你實際上只能存 127 bytes
+    - 這種「犧牲一個位元組」的設計，是針對 「**軟體主導寫入**」（例如 CPU 寫資料進 Buffer）時為了區分滿空而設計的規範。
+  - 我的專案是 **「硬體主導寫入」（DMA 循環搬運）**，硬體是不會遵守這個規範的
+    - 不需要去「實作」犧牲一個位元組
+    - 只需要確保：**讀的速度 > 寫的速度**，並把 rd_ptr == wr_ptr 當作「空」即可
+    - 真正的保險： 檢查 UART 的 **ORE (Overrun Error) 旗標**。如果 rd_ptr == wr_ptr 且 ORE 亮了，代表硬體已經跑太快，發生覆蓋且出錯了
+
 ```
 #include "stm32f072xb.h"
 
