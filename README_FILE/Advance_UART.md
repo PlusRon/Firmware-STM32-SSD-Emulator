@@ -118,7 +118,7 @@ int main(void) {
         if (USART1->ISR & (1UL << 3)) {
             USART1->ICR = (1UL << 3); // 清除錯誤
             UART_Send("\r\n!! OVERRUN ERROR !!\r\n");
-            // 發生 ORE 時，通常建議強制將 rd_ptr 對齊 wr_ptr，拋棄舊資料重新同步
+            // 災難復原 (Disaster Recovery) : 發生 ORE 時，通常建議強制將 rd_ptr 對齊 wr_ptr，拋棄舊資料重新同步
             rd_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
         }
 
