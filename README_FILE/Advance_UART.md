@@ -1,3 +1,165 @@
+### 程式碼 : UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection + 硬體流控 (RTS/CTS) + 加大 Buffer (1024 bytes) + ACK/NACK 機制
+```
+#include "stm32f072xb.h"
+
+/* --- 巨集定義 --- */
+#define RX_BUF_SIZE 1024  // (2) 增加緩衝區至 1024，大幅降低 ORE 機率
+
+/* ASCII 通訊字元定義 */
+#define ASCII_NAK 0x15    // Negative Acknowledge (資料錯誤/重傳請求)
+
+/* --- 全域變數 --- */
+volatile uint32_t msTicks = 0;
+uint8_t rx_buffer[RX_BUF_SIZE];
+uint16_t rd_ptr = 0;
+volatile uint8_t rx_event = 0;
+
+/* --- 系統計時 --- */
+void SysTick_Handler(void) {
+    msTicks++;
+}
+
+uint32_t get_tick(void) {
+    return msTicks;
+}
+
+/* --- LED 模組 --- */
+void LED_Init(void) {
+    RCC->AHBENR |= (1UL << 19);
+    GPIOC->MODER &= ~(3UL << 12);
+    GPIOC->MODER |=  (1UL << 12);
+}
+
+void LED_Toggle(uint8_t *state) {
+    if (*state == 0) {
+        GPIOC->BSRR = (1UL << 6);
+        *state = 1;
+    } else {
+        GPIOC->BSRR = (1UL << 22);
+        *state = 0;
+    }
+}
+
+/* --- UART 與 DMA --- */
+void USART1_IRQHandler(void) {
+    // 檢查 IDLE
+    if (USART1->ISR & (1UL << 4)) {
+        USART1->ICR = (1UL << 4);
+        rx_event = 1;
+    }
+    // 檢查 ORE (Overrun)
+    if (USART1->ISR & (1UL << 3)) {
+        USART1->ICR = (1UL << 3);
+        // 此處不處理邏輯，交由 main 處理 NACK 流程
+    }
+}
+
+void UART_Send(char *s) {
+    while (*s) {
+        while (!(USART1->ISR & (1UL << 7)));
+        USART1->TDR = *s++;
+    }
+}
+
+void UART_SendChar(uint8_t c) {
+    while (!(USART1->ISR & (1UL << 7)));
+    USART1->TDR = c;
+}
+
+/* --- 系統初始化 --- */
+void System_Init(void) {
+    // 1. 時鐘開啟
+    RCC->AHBENR |= (1UL << 17) | (1UL << 19) | (1UL << 0);
+    RCC->APB2ENR |= (1UL << 14);
+
+    LED_Init();
+
+    // 2. GPIO 設定 (PA9=TX, PA10=RX, PA12=RTS)
+    // (3) 硬體流控：加入 PA12 作為 RTS 腳位
+    GPIOA->MODER &= ~((3UL << 18) | (3UL << 20) | (3UL << 24));
+    GPIOA->MODER |=  ((2UL << 18) | (2UL << 20) | (2UL << 24)); // 皆設為 AF 模式
+    
+    // PA9, PA10, PA12 的 AF 都是 AF1 (USART1)
+    GPIOA->AFRH &= ~((0xFUL << 4) | (0xFUL << 8) | (0xFUL << 16));
+    GPIOA->AFRH |=  ((1UL << 4) | (1UL << 8) | (1UL << 16));
+
+    // 3. DMA 設定
+    DMA1->CH[2].CPAR = (uint32_t)&(USART1->RDR);
+    DMA1->CH[2].CMAR = (uint32_t)rx_buffer;
+    DMA1->CH[2].CNDTR = RX_BUF_SIZE;
+    DMA1->CH[2].CCR = (1UL << 7) | (1UL << 5) | (1UL << 0);
+
+    // 4. UART 設定
+    USART1->BRR = 69; // 115200 @ 8MHz
+    
+    // CR3 修改：加入 RTSE (Bit 8) 啟動硬體流控
+    USART1->CR3 = (1UL << 6) | (1UL << 8); 
+    
+    USART1->CR1 = (1UL << 0) | (1UL << 3) | (1UL << 2) | (1UL << 4);
+
+    // 5. NVIC 與 SysTick
+    *((volatile uint32_t *)0xE000E100) = (1UL << 27);
+    SysTick->LOAD = 8000 - 1;
+    SysTick->VAL = 0;
+    SysTick->CTRL = 7;
+}
+
+/* --- 主程式 --- */
+int main(void) {
+    System_Init();
+    uint32_t last_blink = 0;
+    uint8_t led_current_state = 0;
+
+    UART_Send("Industrial UART System Initialized (RTS/NACK Enabled)\r\n");
+
+    while (1) {
+        // --- (1) NACK 重傳機制偵測 ---
+        if (USART1->ISR & (1UL << 3)) {
+            USART1->ICR = (1UL << 3); // 清除 ORE
+            
+            // 發送 NAK 字元，讓對端知道發生錯誤需要重傳 (需對端軟體支援)
+            UART_SendChar(ASCII_NAK); 
+            UART_Send("\r\n[NACK] Overflow Detected! Please resend last packet.\r\n");
+            
+            // 拋棄損壞片段，重置指標
+            rd_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
+        }
+
+        // --- 任務 1：Ring Buffer 高效處理 ---
+        uint16_t wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
+
+        if (rd_ptr != wr_ptr) {
+            // 注意：在高頻通訊中，這段 Print 可能會拖慢速度，建議只在偵錯時開啟
+            UART_Send("Receive: ");
+            
+            while (rd_ptr != wr_ptr) {
+                uint8_t data = rx_buffer[rd_ptr];
+
+                // Echo 輸出
+                while (!(USART1->ISR & (1UL << 7)));
+                USART1->TDR = data;
+
+                rd_ptr++;
+                if (rd_ptr >= RX_BUF_SIZE) rd_ptr = 0;
+                
+                // 實時更新 wr_ptr 以追趕最新資料
+                wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
+            }
+            UART_Send("\r\n");
+            rx_event = 0;
+        }
+
+        // --- 任務 2：背景任務 ---
+        if ((get_tick() - last_blink) >= 500) {
+            LED_Toggle(&led_current_state);
+            last_blink = get_tick();
+        }
+    }
+}
+```
+
+
+
 ### 程式碼 : UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection
 - 一般 Ring Buffer判斷，rd_ptr 和 wr_ptr 再次相等時，是如何分辨緩衝區是「空的」還是「被塞滿一圈」?
   - 常用的做法 : 緩衝區永遠不能真正裝滿，必須保留一個位置
