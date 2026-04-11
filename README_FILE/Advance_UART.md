@@ -130,25 +130,31 @@ int main(void) {
         // --- 任務 1：Ring Buffer 高效處理 ---
         uint16_t wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
 
-        if (rd_ptr != wr_ptr) {
-            // 注意：在高頻通訊中，這段 Print 可能會拖慢速度，建議只在偵錯時開啟
-            UART_Send("Receive: ");
+
+        // 完美整合版：外層用雙重判斷門檻，內層用動態追趕邏輯
+        if (rx_event || (rd_ptr != wr_ptr)) {
             
-            while (rd_ptr != wr_ptr) {
-                uint8_t data = rx_buffer[rd_ptr];
-
-                // Echo 輸出
-                while (!(USART1->ISR & (1UL << 7)));
-                USART1->TDR = data;
-
-                rd_ptr++;
-                if (rd_ptr >= RX_BUF_SIZE) rd_ptr = 0;
+            // 只有在真的有資料（指標不相等）時，才進去讀取 Buffer
+            if (rd_ptr != wr_ptr) {
+                // [理論提示：這裡可以放一個開頭標籤，例如 UART_Send("Recv: "); ]
                 
-                // 實時更新 wr_ptr 以追趕最新資料
-                wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
+                while (rd_ptr != wr_ptr) {
+                    uint8_t data = rx_buffer[rd_ptr];
+        
+                    // 處理資料 (Echo 或存入協議解析器)
+                    while (!(USART1->ISR & (1UL << 7)));
+                    USART1->TDR = data;
+        
+                    rd_ptr++;
+                    if (rd_ptr >= RX_BUF_SIZE) rd_ptr = 0;
+                    
+                    // 核心優點：在迴圈內動態抓取最新寫入指標，確保一次清空
+                    wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
+                }
             }
-            UART_Send("\r\n");
-            rx_event = 0;
+            
+            // 無論是因為指標不相等還是因為 IDLE 事件進來的，處理完後都清空事件
+            rx_event = 0; 
         }
 
         // --- 任務 2：背景任務 ---
