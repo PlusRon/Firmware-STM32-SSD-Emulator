@@ -4,10 +4,30 @@
 ## 一、理論、技術實作
 ### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](README_FILE/UART_introduce.md)
 ### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運，從 中斷驅動 到 硬體自動化
-傳統 UART 接收 是每當 **一個位元組(Byte)** 抵達時，硬體會觸發 **RXNE 中斷**，迫使 CPU 暫停當前工作，跳轉至 **ISR(Interrupt Service Routine)** 去讀取 UART 之 RDR 暫存器。但在 **高速通訊**(Baud Rate : `115200 bps`)下，會導致 CPU 被頻繁打斷，造成嚴重效能損耗與潛在資料丟失風險。
+- **中斷驅動**
+  - 傳統 UART 接收 是每當 **一個位元組(Byte)** 抵達時，硬體會觸發 **RXNE 中斷**，迫使 CPU 暫停當前工作，跳轉至 **ISR(Interrupt Service Routine)** 去讀取 UART 之 **RDR 暫存器**。但在 **高速通訊**(**Baud Rate : `115200 bps`**)下，會導致 CPU 被頻繁打斷，造成嚴重效能損耗與潛在資料丟失風險。
+- **DMA 硬體自動化**
+  - DMA 是 **獨立**於 CPU 的 **硬體控制器**，擁有 **直接存取記憶體匯流排的權限**
+  - DMA 允許 外設(UART) 直接與記憶體 (SRAM) 交換資料
 
-- 理論：DMA 是一個硬體單元，允許外設（UART）直接與記憶體（SRAM）交換資料。
-- 關聯：在本專案中，DMA 負責在背景自動搬運 UART 接收到的位元組，CPU 僅需巡檢指標，完全消除了中斷頻繁打斷主程式的問題。
+    ```
+    DMA1->CH[2].CPAR = (uint32_t)&(USART1->RDR); // 外設位址：指向 UART 接收暫存器
+    DMA1->CH[2].CMAR = (uint32_t)rx_buffer;      // 記憶體位址：指向我們定義的 Ring Buffer
+    ```
+    - **CPAR (Channel Peripheral Address Register)** ： 固定指向 UART 的接收口，即 外設 (Peripheral)
+    - **CMAR (Channel Memory Address Register)** ： 指向存放資料的 ring buffer 陣列的起始位址，即 記憶體 (Memory)
+  - **DMA 監聽 UART 的接收請求(Request)**　： UART 的資料準備好會發送通知給 DMA，背景下 DMA 直接將資料從 `USART->RDR` 搬運到自定義的 **SRAM 緩衝區**
+
+    ```
+    // 4. UART 設定
+    USART1->CR3 = (1UL << 6) | (1UL << 8);
+    ```
+    - **Bit 6 (DMAR, DMA Enable Receiver)**
+    - DMA 硬體會直接偵測 RXNE 訊號，只要 RXNE 為 `1`，瞬間把資料從 `USART1->RDR` 搬到 `rx_buffer`，然後自動清空 RXNE 為 `0`
+    - 告訴 UART 硬體，當 **RXNE 變成 1 (接收暫存器非空)** 時，立刻發出一個 **DMA 請求 (DMA Request)** 給 DMA 控制器
+    - 沒這行，UART 就算收到資料，也只會等待 CPU 來讀，而不會通知 DMA
+  
+  
 
 ### 3. Ring Buffer (循環緩衝區)
 - 理論：一種首尾相連的緩衝結構。DMA 在記憶體中以 Circular Mode 運作。
