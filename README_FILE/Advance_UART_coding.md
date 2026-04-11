@@ -5,24 +5,8 @@
 ### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
 ### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運
 `阻斷式 Polling` → `中斷驅動` → `DMA 硬體自動化`
-- **阻斷式Polling**
-  ```
-  /* --- 1. 阻斷 : 等待讀取 --- */
-  char uart_receive_char(void) {
-      while (!(USART1->ISR & (1UL << 5))); // CPU 在這裡死等，什麼都不能做
-      return (char)(USART1->RDR);
-  }
-  
-  /* --- 2. 主程式 --- */
-  int main(void) {
-    // UART 初始化 
+- **[阻斷式Polling](Polling_to_ISR_DMA/polling.md)**
 
-    while (1) {
-        /* --- 任務 B：阻斷 UART 處理 --- */
-        char received = uart_receive_char();
-        // ... 處理資料 ...
-    }
-  }
   ```
 - **中斷驅動**
   - 由 中斷 (ISR) 在背景完成資料接收，並立即存放到 buffer 中。由 UART 的 ISR(Interrupt Status Register) 中的 RXNE 判斷 UART 的接收端是否已接收到 1 Byte 資料
