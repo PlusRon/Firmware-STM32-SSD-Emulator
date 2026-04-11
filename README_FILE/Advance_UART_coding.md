@@ -50,8 +50,16 @@
     int uart_available(void) {
         return (head != tail);
     }
+
+    /* --- 3. 讀取資料 --- */
+    char uart_read(void) {
+        if (head == tail) return 0;
+        char data = rx_fifo[tail];
+        tail = (tail + 1) % BUFFER_SIZE;
+        return data;
+    }
     
-    /* --- 3. 主程式 --- */
+    /* --- 4. 主程式 --- */
     int main(void) {
         // UART 初始化 
         // LED 初始化 
