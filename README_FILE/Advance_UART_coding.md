@@ -24,6 +24,38 @@
 - 關聯：提供精確的 ms 等級時間戳，用於實現非阻塞式的定時任務（如本專案中的 LED 定時翻轉）
 
 
+## 二、硬體環境設置
+#### Rx 與 Tx **交叉原則**、**共地原則**
+| STM32F072 | USB-to-TTL 模組 | 說明 |
+|:---:|:---:|:---|
+|**GND**|**GND**|提供基準電位，未接會導致訊號判斷失效|
+|**PA9 (TX)**|**RXD**|晶片資料出口連至電腦入口|
+|**PA10 (RX)**|**TXD**|電腦資料出口連至晶片入口|
+
+## 三、韌體實作細節 (Firmware)
+### 核心開發文件
+|查找目標|建議手冊|關鍵章節 (Keywords)|
+|:---:|:---|:---|
+|各周邊 **暫存器位元 (Bit)** 定義|[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)|各周邊(Peripheral) 章節末尾的 **Register description**|
+|**時脈樹 (Clock Tree)** 頻率|[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)|**Reset and clock control (RCC)**/Clock tree、HSI clock|
+|引腳 **複用功能 (AF)** 對照表|[Datasheet (DS9826)](https://www.st.com/resource/en/datasheet/stm32f072c8.pdf)|Pinouts and pin descriptions / **Alternate functions**|
+|**系統控制** 相關的 **暫存器**|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|**System control block (SCB)**/AIRCR|
+|處理器異常與中斷架構|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|Exception model / NVIC|
+
+### 周邊、暫存器、位元 (Bit) 控制
+|周邊|暫存器|控制功能|位元 (Bit) 控制|設定值與物理意義|
+|:---:|:---:|:---:|:---|:---|
+|RCC|AHBENR|GPIO周邊供電開關|Bit 17 (**IOPAEN**)|`1`: 啟動 GPIOA 時脈，GIPOA 周邊暫存器才能運作 <br>(MODER、ODR、AFRH、AFRL 暫存器才能通電做控制)|
+|RCC|APB2ENR|UART周邊供電開關|Bit 14 (**USART1EN**)|`1`: 啟動 USART1 時脈，才能控制 UART1 周邊<br>(通訊電路開始運作)|
+|GPIOA|MODER|引腳模式切換|Bits [19:18] (**PA9**)<br>Bits [21:20] (**PA10**)|`10`: 設定為 Alternate Function (複用模式)|
+|GPIOA|AFRH|複用功能選擇|Bits [7:4] (**PA9**)<br>Bits [11:8] (**PA10**)|`0001`: 指定為 **AF0~AF7** 中的 **AF1** 模式 (硬體連通至 USART1)|
+|USART1|BRR|波特率分頻器|Bits [15:0]|填入計算後的分頻值 : <br>`69`(適用HSI 8M Hz)<br>`417`(適用PLL 48M Hz)|
+|USART1|CR1|UART1模組總控制|Bit 0 (**UE**)<br>Bit 3 (**TE**)<br>Bit 2 (**RE**)|Bit-0 = `1`: 啟動 UART1 模組總開關<br>Bit-3 = `1`: 啟動發送器 (Transmitter)<br>Bit-2 = `1`: 啟動接收器 (Receiver)|
+|USART1|ISR|狀態**監控**(**唯讀**)|Bit 7 (**TXE**)<br>Bit 5 (**RXNE**)|Bit-7 = `1`: 發送區空 (**可寫資料**)<br>Bit-5 = `1`: 接收區有資料 (**可讀資料**)|
+|USART1|TDR|**發送資料**暫存器|Bits [8:0]|寫入此處 ： 資料由 TX 腳位發出去|
+|USART1|RDR|**接收資料**暫存器|Bits [8:0]|讀取此處 ： 由 RX 腳位接收資料|
+
+
 ### 程式碼 : UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection + 硬體流控 (RTS/CTS) + 加大 Buffer (1024 bytes) + ACK/NACK 機制
 ```
 #include "stm32f072xb.h"
