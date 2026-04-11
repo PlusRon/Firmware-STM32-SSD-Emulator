@@ -25,10 +25,10 @@
   }
   ```
 - **中斷驅動**
-  - 真正的資料接收動作是由 中斷 (ISR) 在背景完成
-  - 算是 事件驅動
+  - 由 中斷 (ISR) 在背景完成資料接收，並立即存放到 buffer 中。由 UART 的 ISR(Interrupt Status Register) 中的 RXNE 判斷 UART 的接收端是否已接收到 1 Byte 資料
+  - UART 的硬體 RDR 暫存器只有一個 且 只有 1 Byte，所以必須在中斷程式裡寫資料搬移邏輯至 buffer，下一個 Byte 進來才不會發生 Overrun Error (ORE)，導致後續資料全部遺失
+  - 在主程式中，以事件(當 buffer 有資料) 驅動的方式，讀出 buffer 中的資料
   - 但傳統 UART 接收 是每當 **一個位元組(Byte)** 抵達時，硬體會觸發 **RXNE 中斷**，迫使 CPU 暫停當前工作，跳轉至 **ISR(Interrupt Service Routine)** 去讀取 UART 之 **RDR 暫存器**。但在 **高速通訊**(**Baud Rate : `115200 bps`**)下，會導致 CPU 被頻繁打斷，造成嚴重效能損耗與潛在資料丟失風險。
-  - UART 的硬體 RDR 暫存器只有一個 且 只有 1 Byte，所以必須在中斷程式裡寫資料搬移邏輯，下一個 Byte 進來才不會發生 Overrun Error (ORE)，導致後續資料全部遺失
     ```
     /* --- 1. 中斷服務程式 (ISR) --- */
     // 在背景跑的，每當一個 Byte 被接收進來，CPU 就會暫停 main 跳進來這裡
