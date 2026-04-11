@@ -1,4 +1,4 @@
-# UART 應用邏輯 主程式
+# UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證
 
 ## 一、UART 理論技術
 ### 1. UART (Universal Asynchronous Receiver/Transmitter) 通訊協定(介面)
