@@ -4,7 +4,7 @@
 ## 一、理論、技術實作
 ### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](README_FILE/UART_introduce.md)
 ### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運，從 中斷驅動 到 硬體自動化
-傳統 UART 接收 是每當 **一個位元組(Byte)** 抵達時，硬體會觸發 **RXNE 中斷**，迫使 CPU 暫停當前工作，跳轉至 ISR 讀取 RDR 暫存器。但在 **高速通訊**(Baud Rate : `115200 bps`)下，會導致 CPU 被頻繁打斷，造成嚴重效能損耗與潛在資料丟失風險。
+傳統 UART 接收 是每當 **一個位元組(Byte)** 抵達時，硬體會觸發 **RXNE 中斷**，迫使 CPU 暫停當前工作，跳轉至 **ISR(Interrupt Service Routine)** 去讀取 UART 之 RDR 暫存器。但在 **高速通訊**(Baud Rate : `115200 bps`)下，會導致 CPU 被頻繁打斷，造成嚴重效能損耗與潛在資料丟失風險。
 
 - 理論：DMA 是一個硬體單元，允許外設（UART）直接與記憶體（SRAM）交換資料。
 - 關聯：在本專案中，DMA 負責在背景自動搬運 UART 接收到的位元組，CPU 僅需巡檢指標，完全消除了中斷頻繁打斷主程式的問題。
