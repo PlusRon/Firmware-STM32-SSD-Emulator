@@ -13,6 +13,7 @@ volatile uint32_t msTicks = 0;
 uint8_t rx_buffer[RX_BUF_SIZE];
 uint16_t rd_ptr = 0;
 volatile uint8_t rx_event = 0;
+volatile uint8_t uart_overrun_occurred = 0; // 軟體錯誤標記
 
 /* --- 系統計時 --- */
 void SysTick_Handler(void) {
