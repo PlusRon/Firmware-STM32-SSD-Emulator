@@ -151,6 +151,7 @@ int main(void) {
                     // 核心優點：在迴圈內動態抓取最新寫入指標，確保一次清空
                     wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
                 }
+                UART_Send("\r\n");
             }
             
             // 無論是因為指標不相等還是因為 IDLE 事件進來的，處理完後都清空事件
