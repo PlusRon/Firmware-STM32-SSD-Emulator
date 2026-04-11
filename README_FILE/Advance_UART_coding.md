@@ -4,7 +4,7 @@
 ## 一、理論、技術實作
 ### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](README_FILE/UART_introduce.md)
 ### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運
-`阻斷式 Polling` → `中斷驅動` → `硬體自動化 DMA`
+`阻斷式 Polling` → `中斷驅動` → `DMA 硬體自動化`
 - **阻斷式Polling**
   ```
   /* --- 1. 阻斷 : 等待讀取 --- */
@@ -97,8 +97,24 @@
     - **Bit 6 (DMAR, DMA Enable Receiver)**
     - DMA 硬體會直接偵測 RXNE 訊號，只要 RXNE 為 `1`，瞬間把資料從 `USART1->RDR` 搬到 `rx_buffer`，然後自動清空 RXNE 為 `0`
     - 告訴 UART 硬體，當 **RXNE 變成 1 (接收暫存器非空)** 時，立刻發出一個 **DMA 請求 (DMA Request)** 給 DMA 控制器
-    - 沒這行，UART 就算收到資料，也只會等待 CPU 來讀，而不會通知 DMA
-  
+    - 沒這行，UART 就算收到資料，也只會等待 CPU 來讀 (即 所提及的中斷內搬移)，而不會通知 DMA
+  - 控制暫存器配置 (CCR)
+
+    ```
+    DMA1->CH[2].CCR = (1UL << 7) | (1UL << 5) | (1UL << 0);
+    ```
+    - **MINC (Bit 7)** ： **記憶體位址增量** 模式，確保每搬一個字元，目的地位址會自動 `+1`
+    - **CIRC (Bit 5)** ： **循環模式 (Circular Mode)**，實現不斷電、不停機接收的關鍵，讓 **緩衝區首尾相連**
+    - **EN (Bit 0)** ： 啟動通道
+  - 傳輸長度與循環模式
+
+    ```
+    DMA1->CH[2].CNDTR = RX_BUF_SIZE; // 設定緩衝區總長度 (1024)
+    ```
+    - `CNDTR` 是 **DMA 的下數計數暫存器**
+    - 每搬運完一個 Byte，該值會自動遞減 (RXNE 由 `1` 變 `0` 提供給 Flip-Flop 的負緣觸發驅動)
+    - 當遞減到 0 時，因為已啟用 **循環模式（Circular Mode）**，會自動重新載入 `RX_BUF_SIZE` 並回到緩衝區開頭開始寫入 (利用 Flip-Flop 的 CLR 和 Reset)
+    - 
   
 
 ### 3. Ring Buffer (循環緩衝區)
