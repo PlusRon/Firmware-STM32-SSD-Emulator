@@ -3,9 +3,71 @@
 
 ## 一、理論、技術實作
 ### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](README_FILE/UART_introduce.md)
-### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運，從 中斷驅動 到 硬體自動化
+### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運
+#### 阻斷式Polling → 中斷驅動 → 硬體自動化DMA
+- **阻斷式Polling**
+  ```
+  /* --- 1. 阻斷 : 等待讀取 --- */
+  char uart_receive_char(void) {
+      while (!(USART1->ISR & (1UL << 5))); // CPU 在這裡死等，什麼都不能做
+      return (char)(USART1->RDR);
+  }
+  
+  /* --- 2. 主程式 --- */
+  int main(void) {
+    // UART 初始化 
+
+    while (1) {
+        /* --- 任務 B：阻斷 UART 處理 --- */
+        char received = uart_receive_char();
+        // ... 處理資料 ...
+    }
+  }
+  ```
 - **中斷驅動**
-  - 傳統 UART 接收 是每當 **一個位元組(Byte)** 抵達時，硬體會觸發 **RXNE 中斷**，迫使 CPU 暫停當前工作，跳轉至 **ISR(Interrupt Service Routine)** 去讀取 UART 之 **RDR 暫存器**。但在 **高速通訊**(**Baud Rate : `115200 bps`**)下，會導致 CPU 被頻繁打斷，造成嚴重效能損耗與潛在資料丟失風險。
+  - 真正的資料接收動作是由 中斷（ISR） 在背景完成
+  - 但傳統 UART 接收 是每當 **一個位元組(Byte)** 抵達時，硬體會觸發 **RXNE 中斷**，迫使 CPU 暫停當前工作，跳轉至 **ISR(Interrupt Service Routine)** 去讀取 UART 之 **RDR 暫存器**。但在 **高速通訊**(**Baud Rate : `115200 bps`**)下，會導致 CPU 被頻繁打斷，造成嚴重效能損耗與潛在資料丟失風險。
+
+    ```
+    /* --- 1. 中斷服務程式 (ISR) --- */
+    // 在背景跑的，每當一個 Byte 被接收進來，CPU 就會暫停 main 跳進來這裡
+    void USART1_IRQHandler(void) {
+        // 檢查 RXNE (Bit 5)
+        if (USART1->ISR & (1UL << 5)) {     // CPU 在這裡死等，什麼都不能做
+            char data = (char)USART1->RDR;  // 讀取資料時 會自動清除 RXNE 標誌
+            
+            // 將資料放入環形緩衝區 (忽略溢位處理以簡化邏輯)
+            uint16_t next_head = (head + 1) % BUFFER_SIZE;
+            if (next_head != tail) {
+                rx_fifo[head] = data;
+                head = next_head;
+            }
+        }
+    }
+
+    /* --- 2. 非阻斷 : 檢測狀態 --- */
+    int uart_available(void) {
+        return (head != tail);
+    }
+    
+    /* --- 3. 主程式 --- */
+    int main(void) {
+        // UART 初始化 
+        // LED 初始化 
+
+        while (1) {
+            /* --- 任務 A：非阻斷 LED 閃爍 --- */
+            // 利用一個硬體 SysTick 計數器、搭配背景計數、ISR，不使用阻斷式 delay
+    
+            /* --- 任務 B：非阻斷 UART 處理 --- */
+            // 不再採用 阻斷式polling 等待資料，而是 非阻斷式檢查緩衝區 有沒有資料
+            if (uart_available()) {   // 路過問一下，沒有就跳過
+                char received = uart_read();
+                // ... 處理資料 ...
+            }
+        }
+    }
+    ```
 - **DMA 硬體自動化**
   - DMA 是 **獨立**於 CPU 的 **硬體控制器**，擁有 **直接存取記憶體匯流排的權限**
   - DMA 允許 外設(UART) 直接與記憶體 (SRAM) 交換資料
