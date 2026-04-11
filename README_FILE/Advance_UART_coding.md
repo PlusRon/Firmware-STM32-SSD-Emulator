@@ -3,7 +3,26 @@
 
 ## 一、理論技術
 ### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](README_FILE/UART_introduce.md)
-### 2.
+### 2. DMA (Direct Memory Access) - 零 CPU 介入
+- 理論：DMA 是一個硬體單元，允許外設（UART）直接與記憶體（SRAM）交換資料。
+- 關聯：在本專案中，DMA 負責在背景自動搬運 UART 接收到的位元組，CPU 僅需巡檢指標，完全消除了中斷頻繁打斷主程式的問題。
+
+### 3. Ring Buffer (循環緩衝區)
+- 理論：一種首尾相連的緩衝結構。DMA 在記憶體中以 Circular Mode 運作。
+- 關聯：我們設定 RX_BUF_SIZE = 1024，這能提供足夠的深度來緩衝突發的大量數據，避免 CPU 因短暫忙碌而導致資料被覆蓋。
+
+### 4. IDLE Line Detection (空閒線路偵測)
+- 理論：當 UART 線路維持一個 Byte 以上的高電平（無傳輸）時觸發。
+- 關聯：這是「非固定長度封包」的最佳處理方案。它能主動通知 CPU：「一波資料傳輸已結束，可以開始解析了。」
+
+### 5. 雙重流控機制 (Flow Control)
+- 為了確保在高負載下的資料完整性，系統實施了兩層保護：
+  - 硬體層 (RTS/CTS)：透過 PA12 (RTS) 腳位，由硬體自動控制發送端的節奏。當 Buffer 快滿時，硬體會物理性地讓對方停止傳送。
+  - 軟體層 (ORE Detection & NACK)：若硬體流控失敗導致 Overrun Error (ORE)，系統會透過 USART1_IRQHandler 捕捉異常，並發送 0x15 (NAK) 訊號請求重傳，同時強制同步指標（Disaster Recovery）。
+### 6. SysTick 時基系統
+- 理論：內建於 Cortex-M 核心的遞減計數器。
+- 關聯：提供精確的 ms 等級時間戳，用於實現非阻塞式的定時任務（如本專案中的 LED 定時翻轉）
+
 
 ### 程式碼 : UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection + 硬體流控 (RTS/CTS) + 加大 Buffer (1024 bytes) + ACK/NACK 機制
 ```
