@@ -68,6 +68,11 @@ void UART_SendChar(uint8_t c) {
     USART1->TDR = c;
 }
 
+void My_Delay_ms(uint32_t ms) {
+    uint32_t start = get_tick();
+    while ((get_tick() - start) < ms);
+}
+
 /* --- 系統初始化 --- */
 void System_Init(void) {
     // 1. 時鐘開啟
@@ -163,6 +168,11 @@ int main(void) {
             LED_Toggle(&led_current_state);
             last_blink = get_tick();
         }
+
+        // --- 模擬模擬區：在這裡加入延遲 ---
+        // 建議先試試看 Delay 2000ms (2秒)
+        // 然後從電腦端一次貼上一段非常長的文字 (例如 2000 個字元)
+        My_Delay_ms(2000);
     }
 }
 ```
