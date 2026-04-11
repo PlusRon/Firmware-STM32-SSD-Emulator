@@ -51,6 +51,7 @@ void USART1_IRQHandler(void) {
     if (USART1->ISR & (1UL << 3)) {
         USART1->ICR = (1UL << 3);
         // 此處不處理邏輯，交由 main 處理 NACK 流程
+        uart_overrun_occurred = 1;      // (標記) 告訴 main 剛剛出事了
     }
 }
 
@@ -113,9 +114,9 @@ int main(void) {
     UART_Send("Industrial UART System Initialized (RTS/NACK Enabled)\r\n");
 
     while (1) {
-        // --- (1) NACK 重傳機制偵測 ---
-        if (USART1->ISR & (1UL << 3)) {
-            USART1->ICR = (1UL << 3); // 清除 ORE
+        // --- (1) NACK 重傳機制偵測 之 核心保險機制：檢查軟體錯誤標記 ------
+        if (uart_overrun_occurred) {
+            uart_overrun_occurred = 0;   // 清除標記
             
             // 發送 NAK 字元，讓對端知道發生錯誤需要重傳 (需對端軟體支援)
             UART_SendChar(ASCII_NAK); 
