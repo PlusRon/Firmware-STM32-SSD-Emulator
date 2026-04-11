@@ -1,4 +1,4 @@
-# 阻斷式Polling
+# 阻斷式 Polling
   ```
   /* --- 1. 阻斷 : 等待讀取 --- */
   char uart_receive_char(void) {
