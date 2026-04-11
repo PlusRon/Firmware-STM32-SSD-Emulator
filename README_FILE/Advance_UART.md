@@ -1,3 +1,7 @@
+# 非阻斷式非同步處理
+建構一個 **非阻斷式(Non-blocking) 處理架構**，以解決 **阻塞式等待 (Polling)** 與 **頻繁中斷(Interrupt per Byte)** 兩個問題。透過 **DMA** 與 **Ring Buffer (循環緩衝區)** 的概念，實現 **通訊層** 與 **應用層** 的 **解耦**，讓 CPU 能在接收資料的同時，並行處理如 LED 閃爍、感測器運算等背景任務，挑戰平衡 通訊即時性 與 任務並行處理 兩任務。
+
+
 ### 程式碼 : UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection + 硬體流控 (RTS/CTS) + 加大 Buffer (1024 bytes) + ACK/NACK 機制
 ```
 #include "stm32f072xb.h"
