@@ -116,29 +116,29 @@
       // 檢查 IDLE 旗標位 (Bit 4)
       if (USART1->ISR & (1UL << 4)) {
           USART1->ICR = (1UL << 4); // 關鍵：寫入 ICR 暫存器手動清除旗標
-          rx_event = 1;             // 標記「收件結束」事件，通知主迴圈
+          rx_idle_event = 1;             // 標記「收件結束」事件，通知主迴圈
       }
       // ... 其他旗標檢查 ...
   }
   ```
   - 中斷發生時，CPU 在 IRQ Handler 中僅需做兩件事 (**精簡** 中斷服務程式)
     - 清除 狀態旗標 `ISR` 為 `ICR` (防止重複進入中斷) 
-    - 設定一個全域布林標記 `rx_event`，這符合 ISR (Interrupt Sevice Routine) 應 **極簡且快速** 的原則
+    - 設定一個全域布林標記 `rx_idle_event`，這符合 ISR (Interrupt Sevice Routine) 應 **極簡且快速** 的原則
     - 將耗時的資料處理留給 main 迴圈，透過 事件布林標記判斷以執行資料處理
    
 - #### 主迴圈的雙重門檻判斷
 
   ```
   // 完美整合版：外層用雙重判斷門檻
-  if (rx_event || (rd_ptr != wr_ptr)) {
+  if (rx_idle_event || (rd_ptr != wr_ptr)) {
       // ... 進入資料解析 ...
-      rx_event = 0; // 處理完畢後清空
+      rx_idle_event = 0; // 處理完畢後清空
   }
   ```
-  - 使用 **事件驅動 (rx_event)** 與 **狀態驅動 (`rd_ptr` 和 `wr_ptr` 不相等)** 的雙重保險
-  - `rx_event` ： 處理整串封包抵達後的立即解析
+  - 使用 **事件驅動 (rx_idle_event)** 與 **狀態驅動 (`rd_ptr` 和 `wr_ptr` 不相等)** 的雙重保險
+  - `rx_idle_event` ： 處理整串封包抵達後的立即解析
   - `rd_ptr` 和 `wr_ptr` 不相等 ： 處理在解析過程中又持續進來的散碎資料
-  - 即使 `My_Delay_ms(2000)` 讓 CPU 錯過了 IDLE 觸發的瞬間，CPU 醒來後依然可以透過指標判斷將資料領走，而 `rx_event` 則作為一種 **主動喚醒** 的高效機制
+  - 即使 `My_Delay_ms(2000)` 讓 CPU 錯過了 IDLE 觸發的瞬間，CPU 醒來後依然可以透過指標判斷將資料領走，而 `rx_idle_event` 則作為一種 **主動喚醒** 的高效機制
 
 
 ### (5) 雙重流控機制 (Flow Control) - 高負載下的資料零遺失與自癒能力
@@ -293,13 +293,13 @@ UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection + 硬體流控 (RTS/CT
 #define ASCII_NAK 0x15    // Negative Acknowledge (Data Error / Re-transmission Request)
 
 /* --- global variable --- */
-volatile uint32_t msTicks = 0;
-uint8_t rx_buffer[RX_BUF_SIZE];
-uint16_t rd_ptr = 0;
-volatile uint8_t rx_event = 0;
+volatile uint32_t msTicks = 0;               // 8000 clock as a 1ms(1 Tick)
+uint8_t rx_buffer[RX_BUF_SIZE];              // buffer assign from RAM
+uint16_t rd_ptr = 0;                         // CPU(consumer) read pointer (software)
+volatile uint8_t rx_idle_event = 0;          // IDLE event
 volatile uint8_t uart_overrun_occurred = 0;  // software ORE flag
 
-/* --- system timing --- */
+/* --- system timing ISR--- */
 void SysTick_Handler(void) {
     msTicks++;
 }
@@ -310,17 +310,18 @@ uint32_t get_tick(void) {
 
 /* --- LED module --- */
 void LED_Init(void) {
-    RCC->AHBENR |= (1UL << 19);
-    GPIOC->MODER &= ~(3UL << 12);
-    GPIOC->MODER |=  (1UL << 12);
+    RCC->AHBENR |= (1UL << 19);     // power on GIPOC
+    GPIOC->MODER &= ~(3UL << 12);   // PC6 clear Mode
+    GPIOC->MODER |=  (1UL << 12);   // PC6 set Mode as GPO
 }
 
+/* Bit Set Reset Register*/
 void LED_Toggle(uint8_t *state) {
     if (*state == 0) {
-        GPIOC->BSRR = (1UL << 6);
+        GPIOC->BSRR = (1UL << 6);     // SET PC6
         *state = 1;
     } else {
-        GPIOC->BSRR = (1UL << 22);
+        GPIOC->BSRR = (1UL << 22);    // RESET PC6
         *state = 0;
     }
 }
@@ -330,7 +331,7 @@ void USART1_IRQHandler(void) {
     // check IDLE
     if (USART1->ISR & (1UL << 4)) {
         USART1->ICR = (1UL << 4);
-        rx_event = 1;
+        rx_idle_event = 1;
     }
     // check ORE (Overrun)
     if (USART1->ISR & (1UL << 3)) {
@@ -425,7 +426,7 @@ int main(void) {
 
 
         // The outer layer uses a double-judgment threshold, and the inner layer uses dynamic catch-up logic.
-        if (rx_event || (rd_ptr != wr_ptr)) {
+        if (rx_idle_event || (rd_ptr != wr_ptr)) {
             
             // Only when there is actual data (pointer are not equal) will the buffer be read.
             if (rd_ptr != wr_ptr) {
@@ -449,7 +450,7 @@ int main(void) {
             
             // 無論是因為指標不相等還是因為 IDLE 事件進來的，處理完後都清空事件
             // All events should be cleared after processing, whether the issue from unequal pointer or from an IDLE event 
-            rx_event = 0; 
+            rx_idle_event = 0; 
         }
 
         // --- Task 2: Background Task ---
