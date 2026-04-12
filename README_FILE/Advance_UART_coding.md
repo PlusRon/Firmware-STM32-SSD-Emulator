@@ -286,20 +286,20 @@ UART + DMA(Ring Buffer) + ORE（Overrun Error）Detection + 硬體流控 (RTS/CT
 ```
 #include "stm32f072xb.h"
 
-/* --- 巨集定義 --- */
-#define RX_BUF_SIZE 1024  // (2) 增加緩衝區至 1024，大幅降低 ORE 機率
+/* --- MACRO define --- */
+#define RX_BUF_SIZE 1024  // Increasing the buffer size to 1024, significantly reduces the probability of ORE
 
-/* ASCII 通訊字元定義 */
-#define ASCII_NAK 0x15    // Negative Acknowledge (資料錯誤/重傳請求)
+/* ASCII communication character definitions */
+#define ASCII_NAK 0x15    // Negative Acknowledge (Data Error / Re-transmission Request)
 
-/* --- 全域變數 --- */
+/* --- global variable --- */
 volatile uint32_t msTicks = 0;
 uint8_t rx_buffer[RX_BUF_SIZE];
 uint16_t rd_ptr = 0;
 volatile uint8_t rx_event = 0;
-volatile uint8_t uart_overrun_occurred = 0; // 軟體錯誤標記
+volatile uint8_t uart_overrun_occurred = 0;  // software ORE flag
 
-/* --- 系統計時 --- */
+/* --- system timing --- */
 void SysTick_Handler(void) {
     msTicks++;
 }
@@ -308,7 +308,7 @@ uint32_t get_tick(void) {
     return msTicks;
 }
 
-/* --- LED 模組 --- */
+/* --- LED module --- */
 void LED_Init(void) {
     RCC->AHBENR |= (1UL << 19);
     GPIOC->MODER &= ~(3UL << 12);
@@ -325,18 +325,19 @@ void LED_Toggle(uint8_t *state) {
     }
 }
 
-/* --- UART 與 DMA --- */
+/* --- UART and DMA --- */
 void USART1_IRQHandler(void) {
-    // 檢查 IDLE
+    // check IDLE
     if (USART1->ISR & (1UL << 4)) {
         USART1->ICR = (1UL << 4);
         rx_event = 1;
     }
-    // 檢查 ORE (Overrun)
+    // check ORE (Overrun)
     if (USART1->ISR & (1UL << 3)) {
         USART1->ICR = (1UL << 3);
-        // 此處不處理邏輯，交由 main 處理 NACK 流程
-        uart_overrun_occurred = 1;      // (標記) 告訴 main 剛剛出事了
+
+        // No logic is handled here; the NACK process is delegated to the main function.
+        uart_overrun_occurred = 1;      // (Mark) to tell main() that something just happened (ORE)
     }
 }
 
@@ -357,45 +358,47 @@ void My_Delay_ms(uint32_t ms) {
     while ((get_tick() - start) < ms);
 }
 
-/* --- 系統初始化 --- */
+/* --- System initialization --- */
 void System_Init(void) {
-    // 1. 時鐘開啟
+    // 1. clock on
     RCC->AHBENR |= (1UL << 17) | (1UL << 19) | (1UL << 0);
     RCC->APB2ENR |= (1UL << 14);
 
     LED_Init();
 
-    // 2. GPIO 設定 (PA9=TX, PA10=RX, PA12=RTS)
-    // (3) 硬體流控：加入 PA12 作為 RTS 腳位
+    // 2. clear setting
     GPIOA->MODER &= ~((3UL << 18) | (3UL << 20) | (3UL << 24));
-    GPIOA->MODER |=  ((2UL << 18) | (2UL << 20) | (2UL << 24)); // 皆設為 AF 模式
+
+    // 2. GPIO settings (PA9=TX, PA10=RX, PA12=RTS)
+    // 3. Hardware flow control : Add PA12 as an RTS pin
+    GPIOA->MODER |=  ((2UL << 18) | (2UL << 20) | (2UL << 24));  // All set to AF mode
     
-    // PA9, PA10, PA12 的 AF 都是 AF1 (USART1)
+    // 4. The AF values ​​for PA9, PA10, and PA12 are all AF1 (USART1)
     GPIOA->AFRH &= ~((0xFUL << 4) | (0xFUL << 8) | (0xFUL << 16));
     GPIOA->AFRH |=  ((1UL << 4) | (1UL << 8) | (1UL << 16));
 
-    // 3. DMA 設定
+    // 5. DMA setting
     DMA1->CH[2].CPAR = (uint32_t)&(USART1->RDR);
     DMA1->CH[2].CMAR = (uint32_t)rx_buffer;
     DMA1->CH[2].CNDTR = RX_BUF_SIZE;
     DMA1->CH[2].CCR = (1UL << 7) | (1UL << 5) | (1UL << 0);
 
-    // 4. UART 設定
-    USART1->BRR = 69; // 115200 @ 8MHz
+    // 6. UART setting
+    USART1->BRR = 69;  // 115200 Baud Rate @ 8MHz
     
-    // CR3 修改：加入 RTSE (Bit 8) 啟動硬體流控
+    // 7. CR3 Modification: Added RTSE (Bit 8) to enable hardware flow control.
     USART1->CR3 = (1UL << 6) | (1UL << 8); 
     
     USART1->CR1 = (1UL << 0) | (1UL << 3) | (1UL << 2) | (1UL << 4);
 
-    // 5. NVIC 與 SysTick
+    // 8. NVIC and SysTick
     *((volatile uint32_t *)0xE000E100) = (1UL << 27);
     SysTick->LOAD = 8000 - 1;
     SysTick->VAL = 0;
     SysTick->CTRL = 7;
 }
 
-/* --- 主程式 --- */
+/* --- Main --- */
 int main(void) {
     System_Init();
     uint32_t last_blink = 0;
@@ -404,58 +407,60 @@ int main(void) {
     UART_Send("Industrial UART System Initialized (RTS/NACK Enabled)\r\n");
 
     while (1) {
-        // --- (1) NACK 重傳機制偵測 之 核心保險機制：檢查軟體錯誤標記 ------
+        /* --- Core safeguard mechanism for NACK retransmission detection: checking software error flags ------ */
         if (uart_overrun_occurred) {
-            uart_overrun_occurred = 0;   // 清除標記
+            uart_overrun_occurred = 0;   // clear flag
             
-            // 發送 NAK 字元，讓對端知道發生錯誤需要重傳 (需對端軟體支援)
+            // Send the NAK character to let the other end know that an error has occurred and a retransmission is needed
+            // requires software !support! on the other end
             UART_SendChar(ASCII_NAK); 
             UART_Send("\r\n[NACK] Overflow Detected! Please resend last packet.\r\n");
             
-            // 拋棄損壞片段，重置指標
+            // Discard corrupted segments and reset pointer.
             rd_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
         }
 
-        // --- 任務 1：Ring Buffer 高效處理 ---
+        // --- Task 1: Efficient processing of Ring Buffer ---
         uint16_t wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
 
 
-        // 完美整合版：外層用雙重判斷門檻，內層用動態追趕邏輯
+        // The outer layer uses a double-judgment threshold, and the inner layer uses dynamic catch-up logic.
         if (rx_event || (rd_ptr != wr_ptr)) {
             
-            // 只有在真的有資料（指標不相等）時，才進去讀取 Buffer
+            // Only when there is actual data (pointer are not equal) will the buffer be read.
             if (rd_ptr != wr_ptr) {
-                // [理論提示：這裡可以放一個開頭標籤，例如 UART_Send("Recv: "); ]
+                // [ hint : can put a header tag here, for example, UART_Send("Recv: ");]
                 
                 while (rd_ptr != wr_ptr) {
                     uint8_t data = rx_buffer[rd_ptr];
         
-                    // 處理資料 (Echo 或存入協議解析器)
+                    // Process data (Echo or store into the protocol parser)
                     while (!(USART1->ISR & (1UL << 7)));
                     USART1->TDR = data;
         
                     rd_ptr++;
                     if (rd_ptr >= RX_BUF_SIZE) rd_ptr = 0;
                     
-                    // 核心優點：在迴圈內動態抓取最新寫入指標，確保一次清空
+                    // Dynamically captures the latest written pointer within the loop, ensuring a single clear.
                     wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
                 }
                 UART_Send("\r\n");
             }
             
             // 無論是因為指標不相等還是因為 IDLE 事件進來的，處理完後都清空事件
+            // All events should be cleared after processing, whether the issue from unequal pointer or from an IDLE event 
             rx_event = 0; 
         }
 
-        // --- 任務 2：背景任務 ---
+        // --- Task 2: Background Task ---
         if ((get_tick() - last_blink) >= 500) {
             LED_Toggle(&led_current_state);
             last_blink = get_tick();
         }
 
-        // --- 模擬模擬區：在這裡加入延遲 ---
-        // 建議先試試看 Delay 2000ms (2秒)
-        // 然後從電腦端一次貼上一段非常長的文字 (例如 2000 個字元)
+        // --- Simulation area: Add delay here ---
+        // Trying Delay 2000ms (2 seconds) first.
+        // Then paste a very long text (e.g., 2000 characters) from the computer at once
         My_Delay_ms(2000);
     }
 }
