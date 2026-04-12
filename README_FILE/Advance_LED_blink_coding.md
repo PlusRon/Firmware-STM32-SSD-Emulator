@@ -1,23 +1,28 @@
-# LED Flashing
+# GPIO 原子性操作 (BSRR) 與 SysTick 非阻塞時基系統
 
-## 一、 BSRR (Bit Set Reset Register) 的 寫入即觸發 (Write-only to trigger)
-- **原子操作 (Atomic Operation)** : 高頻中斷或多工環境下，改用 BSRR (Bit Set Reset Register)，可達成 **寫入即觸發 (Write-only to trigger)**
-    - 低 16 位為 SET 操作 : **寫 1** 到 低 16 位，對應 **Pin 變高**
-    - 低 16 位為 RESET 操作 : **寫 1** 到 高 16 位，對應 **Pin 變低**
-    - 寫 0 則完全沒影響
-- 像是一個 RS 鎖存器 (RS Latch)
+## 一、 BSRR (Bit Set Reset Register) - 確保硬體操作的原子性
+**原子操作 (Atomic Operation)** ： 高頻中斷或多工環境下，改用 BSRR (Bit Set Reset Register)
+  - **寫入即觸發 (Write-only to trigger)**
+    - 低 16 位為 SET 操作 ： **寫 1** 到 低 16 位，對應 **Pin 變高** (RS-Latch 的 S = 1)
+    - 低 16 位為 RESET 操作 ： **寫 1** 到 高 16 位，對應 **Pin 變低** (RS-Latch 的 R = 1)
+    - 寫 0 則完全沒影響 (RS-Latch 的 S=0 且 R = 0)
+- **RS 鎖存器 (RS Latch)** 的概念
   - 當 Set 線 收到脈衝 (寫入 1)，輸出鎖定在 1
   - 當 Reset 線 收到脈衝 (寫入 1)，輸出鎖定在 0
   - 如果兩條線都沒訊號 (寫入 0)，輸出就保持上一次的狀態
 - BSRR 內部連接了兩條線到 PC6 的控制電路
-  - 一條叫 **Set 線** (連接到 Bit 6)
-  - 一條叫 **Reset 線** (連接到 Bit 22)
+  - 一條叫 **Set 線** (連接到 BSRR 的 Bit 6)
+  - 一條叫 **Reset 線** (連接到 BSRR 的 Bit 22)
 - 無內建的 **翻轉 (Toggle)** 位元
   - 需要配合一個軟體變數來記錄狀態
   - 或是讀取 ODR 的當前值來判斷
 - 優先權機制
-  - 根據手冊，如果同時在 BS6 與 BR6 寫入 1，**BS6 (Set) 具有優先權**（視型號而定），進一步定義了硬體在極端衝突下的預期行為
-
+  - 根據手冊，如果同時在 **BS6** 與 **BR6** 寫入 `1`，**BS6 (Set) 具有優先權**（視型號而定），進一步定義了硬體在極端衝突下的預期行為
+```
+* 非原子性 (Non-atomic)
+  - |= 或 &=  ： 在處理器內部會分解成 「讀取-修改-寫回」 三個步驟
+  - 如果在「讀取」後、「寫回」前發生了中斷，且中斷裡也修改了同一個連接埠的其他腳位，那麼中斷所做的修改會被主程式寫回的舊值蓋掉，導致狀態錯誤
+```
 ### 程式碼
 ```
 #include "stm32f072xb.h"
