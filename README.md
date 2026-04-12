@@ -1,5 +1,5 @@
 # Firmware-STM32-SSD-Emulator
-Firmware-STM32-SSD-Emulator
+實作從 Linker Script 與 Startup 開始的純手寫開機流程，建構基於 Linux 環境的自動化建置系統；核心技術包含自定義硬體抽象層、SysTick 非阻塞時基，以及結合 DMA、Ring Buffer 與硬體流控的專業級高效能 UART 非同步通訊架構
 
 ## Outline
 #### [開發環境 (Environment Setup)](#一開發環境-Environment-Setup)
