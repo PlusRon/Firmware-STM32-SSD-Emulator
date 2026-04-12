@@ -2,8 +2,8 @@
 建構一個 **非阻斷式(Non-blocking) 處理架構**，以解決 **阻塞式等待 (Polling)** 與 **頻繁中斷(Interrupt per Byte)** 兩個問題。透過 **DMA** 與 **Ring Buffer (循環緩衝區)** 的概念，實現 **通訊層** 與 **應用層** 的 **解耦**，讓 CPU 能在接收資料的同時，並行處理如 LED 閃爍、感測器運算等背景任務，挑戰平衡 通訊即時性 與 任務並行處理 兩任務。
 
 ## 一、理論、技術實作
-### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
-### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運
+### [UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
+### DMA (Direct Memory Access)：零 CPU 介入的資料搬運
 [`阻斷式 Polling`](Polling_to_ISR_DMA/polling.md) → [`中斷驅動`](Polling_to_ISR_DMA/ISR.md) → `DMA 硬體自動化`
 - **DMA 硬體自動化**
   - DMA 是 **獨立**於 CPU 的 **硬體控制器**，擁有 **直接存取記憶體匯流排的權限**
@@ -51,7 +51,7 @@
     - 用 **總長度 - 剩餘計數(CNDTR)**，精確換算出 `wr_ptr`（算出隱藏在硬體內部的 write pointer，即 `MINC = 1` 所創建的指標）
     - 使軟體中的 `rd_ptr` 能夠精確地追蹤硬體中 Buffer 內的存放狀態
 
-### 3. Ring Buffer (循環緩衝區) — 非同步生產者/消費者模型
+### Ring Buffer (循環緩衝區) — 非同步生產者/消費者模型
 透過 **兩個指標 (`rd_ptr` 與 `wr_ptr`)** 並 設定 **DMA 硬體循環模式(Circular Mode)**，達到 Ring Buffer
 - **生產者 / 消費者模型**
   - **DMA** 作為 **生產者**(負責寫入)，**CPU** 作為 **消費者**(負責讀取)，只要 **消費者讀取速度快於生產者寫入速度**，緩衝區就能源源不絕的運作
@@ -100,11 +100,11 @@
   ```
   - 高流量下，進入 `while-loop` 處理 50 個字元的期間，DMA 可能又寫入了 20 個字
   - 必須在迴圈末端動態更新 `wr_ptr`，而 `rd_ptr` 會像 追隨者 一樣不斷消耗 Ring Buffer 內的新進資料，直到緩衝區真正被清空為止，極大地降低了中斷觸發次數與封包延遲 
-### 4. IDLE Line Detection (空閒線路偵測)
+### IDLE Line Detection (空閒線路偵測)
 - 理論：當 UART 線路維持一個 Byte 以上的高電平（無傳輸）時觸發。
 - 關聯：這是「非固定長度封包」的最佳處理方案。它能主動通知 CPU：「一波資料傳輸已結束，可以開始解析了。」
 
-### 5. 雙重流控機制 (Flow Control)
+### 雙重流控機制 (Flow Control)
 - 為了確保在高負載下的資料完整性，系統實施了兩層保護：
   - 硬體層 (RTS/CTS)：透過 PA12 (RTS) 腳位，由硬體自動控制發送端的節奏。當 Buffer 快滿時，硬體會物理性地讓對方停止傳送。
   - 軟體層 (ORE Detection & NACK)：若硬體流控失敗導致 Overrun Error (ORE)，系統會透過 USART1_IRQHandler 捕捉異常，並發送 0x15 (NAK) 訊號請求重傳，同時強制同步指標（Disaster Recovery）。
