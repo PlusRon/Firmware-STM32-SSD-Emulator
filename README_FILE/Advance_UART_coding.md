@@ -3,7 +3,7 @@
 
 ## 一、理論、技術實作
 ### [UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
-### DMA (Direct Memory Access)：零 CPU 介入的資料搬運
+### DMA (Direct Memory Access) - 零 CPU 介入的資料搬運
 [`阻斷式 Polling`](Polling_to_ISR_DMA/polling.md) → [`中斷驅動`](Polling_to_ISR_DMA/ISR.md) → `DMA 硬體自動化`
 - **DMA 硬體自動化**
   - DMA 是 **獨立**於 CPU 的 **硬體控制器**，擁有 **直接存取記憶體匯流排的權限**
@@ -100,7 +100,9 @@
   ```
   - 高流量下，進入 `while-loop` 處理 50 個字元的期間，DMA 可能又寫入了 20 個字
   - 必須在迴圈末端動態更新 `wr_ptr`，而 `rd_ptr` 會像 追隨者 一樣不斷消耗 Ring Buffer 內的新進資料，直到緩衝區真正被清空為止，極大地降低了中斷觸發次數與封包延遲 
-### IDLE Line Detection (空閒線路偵測)
+### IDLE Line Detection (空閒線路偵測) - 處理非固定長度封包
+- 當 UART 的 RX 線路接收完一個 Byte 後，其 **ISR (Interrupt State) 偵測到 IDLE 狀態** 維持在 **高電平超過一個 Byte 的時間**，硬體就會自動將 IDLE 旗標置 `1`
+- 能精確在 一串資料 **傳送結束的瞬間通知 CPU**，適合處理長度不一的封包 (EX. AT 指令、自定義協議)
 - 理論：當 UART 線路維持一個 Byte 以上的高電平（無傳輸）時觸發。
 - 關聯：這是「非固定長度封包」的最佳處理方案。它能主動通知 CPU：「一波資料傳輸已結束，可以開始解析了。」
 
