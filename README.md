@@ -8,7 +8,7 @@ Firmware-STM32-SSD-Emulator
 - [Linux to STM32 開發環境建置](#Linux-to-STM32-開發環境建置)
 #### [STM32硬體啟動流程 (Startup Procedure)](#二STM32硬體啟動流程-Startup-Procedure)
 - [查閱核心開發文件](#查閱核心開發文件)
-- [linker_script.ld 實作](#linker_script.ld-實作)
+- [linker_script.ld 實作](#linker_scriptld-實作)
 #### [主程式碼實作 (Implementation)](#三主程式碼實作-Implementation)
 #### [自動化建置系統 STM32 Makefile](四自動化建置系統-STM32-Makefile)
 
