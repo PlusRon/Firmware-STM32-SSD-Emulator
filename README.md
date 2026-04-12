@@ -31,7 +31,10 @@ Firmware-STM32-SSD-Emulator
       <img width="1009" height="447" alt="image" src="https://github.com/user-attachments/assets/2ca2ff23-cefb-4a80-9369-6bccc6a4b9c1" />
 
 - **撰寫 Linker Script 腳本**：告訴連結器（Linker）如何將編譯好的目標檔案（`.o`）組合，並擺放到正確的記憶體位址
-  - `.ld` 是 Linker Script（連結器腳本），使用 **GNU Linker Command Language**（GNU 連結器命令語言）
+   - #### [linker_script.ld 實作](README_FILE/linker_script.md)
+     - **MEMORY** 程式碼區塊
+     - **SECTIONS** 程式碼區塊
+   - `.ld` 是 Linker Script（連結器腳本），使用 **GNU Linker Command Language**（GNU 連結器命令語言）
     
       | 特性 | C語言 | `linker_script.ld` |
       |:---: | :---: | :---: |
@@ -44,9 +47,7 @@ Firmware-STM32-SSD-Emulator
     - `KEEP` : 強制連結器保留特定區段（如 **中斷向量表`KEEP(*(.isr_vector))`**），防止被 **Garbage Collection** 刪除
     - `ALIGN(4)` : 強迫資料從 **4 位元組對齊** 的位址開始，確保 **CPU 最高效率存取**
     - `ORIGIN`, `LENGTH` : 記憶體區塊的起始位址與大小
-  - #### [linker_script.ld 實作](README_FILE/linker_script.md)
-    - **MEMORY** 程式碼區塊
-    - **SECTIONS** 程式碼區塊
+
 
 - **撰寫開機導引 (Bootloader)**：STM32 通電（Power-on）或按下 Reset 鍵的那一刻，CPU 並不具備執行 C 語言環境的能力，必須撰寫 `startup.c` 來手動配置硬體環境，並引導系統進入 `main()`
   - #### [startup.c 實作](README_FILE/startup.md)
