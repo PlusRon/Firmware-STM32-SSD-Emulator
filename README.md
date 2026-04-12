@@ -14,7 +14,7 @@ Firmware-STM32-SSD-Emulator
 - [硬體抽象層：stm32f072xb.h 底層暫存器定義實作](#stm32f072xbh-底層暫存器定義實作)
 - [應用邏輯層：GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](#GPIO-原子性操作-BSRRSysTick-非阻塞時基系統)
 - [應用邏輯層：UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](#UART-非阻斷式非同步收發資料處理-UARTDMARing-BufferIDLEFlow-ControlSystem-Tick)
-#### [自動化建置系統 STM32 Makefile](四自動化建置系統-STM32-Makefile)
+#### [自動化建置系統 STM32 Makefile](#四自動化建置系統-STM32-Makefile)
 
 ## 一、開發環境 (Environment Setup)
 本專案捨棄笨重的 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
@@ -118,7 +118,7 @@ Firmware-STM32-SSD-Emulator
   - #### [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](README_FILE/Advance_UART_coding.md)
     
 
-## 四、自動化建置系統 STM32 Makefile 
+## 四、自動化建置系統 STM32 Makefile
 為 STM32 (Cortex-M0) 建置一套具備 **增量編譯 (Incremental Build)**、**空間優化 (Space Optimization)** 與 **OpenOCD一鍵燒錄** 功能的 Makefile
 - #### [Makefile 兩階段編譯、燒入實作](README_FILE/makefile.md)
 - #### 核心硬體觀念：32 位元處理器與 16 位元指令
