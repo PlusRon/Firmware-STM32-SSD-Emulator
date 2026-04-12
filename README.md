@@ -4,8 +4,8 @@ Firmware-STM32-SSD-Emulator
 ## Outline
 #### [開發環境 (Environment Setup)](#一開發環境-Environment-Setup)
 - [Hardware Requirements](#Hardware-Requirements)
-- Software Toolchain
-- Linux to STM32 開發環境建置
+- [Software Toolchain](#Software-Toolchain)
+- [Linux to STM32 開發環境建置](#Linux-to-STM32-開發環境建置)
 #### [STM32硬體啟動流程 (Startup Procedure)](#二STM32硬體啟動流程-Startup-Procedure)
 #### [主程式碼實作 (Implementation)](#三主程式碼實作-Implementation)
 #### [自動化建置系統 STM32 Makefile](四自動化建置系統-STM32-Makefile)
