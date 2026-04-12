@@ -3,7 +3,7 @@
 ## Outline
 #### [理論、技術實作](#一理論技術實作)
 - [UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](#1-UART-模組理論含通訊工具硬體設置韌體實作除錯驗證)
-- [(2) DMA (Direct Memory Access) - 零 CPU 介入的資料搬運](#2-DMA-Direct-Memory-Access--零-CPU-介入的資料搬運)
+- [(2) DMA (Direct Memory Access) - 零 CPU 介入的資料搬運](#2-DMA-Direct-Memory-Access-零-CPU-介入的資料搬運)
 #### [硬體環境設置](#二硬體環境設置)
 #### [韌體實作細節 (Firmware)](#三韌體實作細節-Firmware)
 #### [除錯與驗證 (Troubleshooting)](#四除錯與驗證-Troubleshooting)
