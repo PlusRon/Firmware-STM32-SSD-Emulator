@@ -2,7 +2,7 @@
 建構一個 **非阻斷式(Non-blocking) 處理架構**，以解決 **阻塞式等待 (Polling)** 與 **頻繁中斷(Interrupt per Byte)** 兩個問題。透過 **DMA** 與 **Ring Buffer (循環緩衝區)** 的概念，實現 **通訊層** 與 **應用層** 的 **解耦**，讓 CPU 能在接收資料的同時，並行處理如 LED 閃爍、感測器運算等背景任務，挑戰平衡 通訊即時性 與 任務並行處理 兩任務。
 ## Outline
 #### [理論、技術實作](#一理論技術實作)
-- [UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](#1-UART-模組理論含通訊工具硬體設置韌體實作除錯驗證)
+- [UART 硬體介紹(含通訊工具)、硬體設置、韌體實作、除錯驗證](#1-UART-硬體介紹含通訊工具硬體設置韌體實作除錯驗證)
 - [DMA (Direct Memory Access)：零CPU介入的資料搬運](#2-DMA-Direct-Memory-Access零CPU介入的資料搬運)
 - [Ring Buffer (循環緩衝區)：非同步生產者/消費者模型](#3-Ring-Buffer-循環緩衝區非同步生產者消費者模型)
 - [IDLE Line Detection (空閒線路偵測)：處理 非固定長度封包](#4-IDLE-Line-Detection-空閒線路偵測處理-非固定長度封包)
@@ -13,7 +13,7 @@
 #### [除錯與驗證 (Troubleshooting)](#四除錯與驗證-Troubleshooting)
 
 ## 一、理論、技術實作
-### [(1) UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
+### [(1) UART 硬體介紹(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
 ### (2) DMA (Direct Memory Access)：零CPU介入的資料搬運
 [`阻斷式 Polling`](Polling_to_ISR_DMA/polling.md) → [`中斷驅動`](Polling_to_ISR_DMA/ISR.md) → `DMA 硬體自動化`
 - **DMA 硬體自動化**
