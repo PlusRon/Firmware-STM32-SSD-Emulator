@@ -144,7 +144,22 @@
 ### 雙重流控機制 (Flow Control) - 高負載下的資料零遺失與自癒能力
 在非同步通訊中，當 **發送端速度 > 接收端處理速度** 時，會發生嚴重的 **資料溢位**，透過 硬體 與 軟體 的雙重守護，構建穩健的通訊鏈路
 - #### 第一層防護 ： 硬體級流控 (RTS/CTS)
-硬體流控 (Hardware Flow Control)，直接在物理層運作，使用 **RTS (Request To Send)** 訊號
+- 硬體流控 (Hardware Flow Control)，直接在物理層運作，使用 **RTS (Request To Send)** 訊號
+  - 當 STM32 接收的 FIFO 或 Buffer 接近滿載時，硬體會自動將 **`PA12` (RTS)** 腳位拉高
+  - 發送端（電腦）偵測到其 **CTS (Clear To Send)** 線變為高電位後，會立即停止物理性發送，直到 STM32 處理完資料並拉低 RTS 為止
+- GPIO 配置
+
+  ```
+  // (3) 硬體流控：加入 PA12 作為 RTS 腳位
+  GPIOA->MODER |= (2UL << 24); // 設定為 Alternate Function 模式
+  GPIOA->AFRH  |= (1UL << 16); // 指向 AF1 (USART1_RTS)
+  ```
+- 外設控制
+
+  ```
+  USART1->CR3 |= (1UL << 8); // 啟動 RTSE (RTS Enable) 位元
+  ```
+  - 設定完成後，**RTS 的電位切換** 完全 **由 UART 硬體控制器自動管理**，不佔用任何 CPU 週期
 
 - 為了確保在高負載下的資料完整性，系統實施了兩層保護：
   - 硬體層 (RTS/CTS)：透過 PA12 (RTS) 腳位，由硬體自動控制發送端的節奏。當 Buffer 快滿時，硬體會物理性地讓對方停止傳送。
