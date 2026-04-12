@@ -4,9 +4,7 @@
 ## 一、理論、技術實作
 ### [1. UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
 ### 2. DMA (Direct Memory Access)：零 CPU 介入的資料搬運
-`阻斷式 Polling` → `中斷驅動` → `DMA 硬體自動化`
-- **[阻斷式Polling](Polling_to_ISR_DMA/polling.md)**
-- **[中斷驅動](Polling_to_ISR_DMA/ISR.md)**
+[`阻斷式 Polling`](Polling_to_ISR_DMA/polling.md) → [`中斷驅動`](Polling_to_ISR_DMA/ISR.md) → `DMA 硬體自動化`
 - **DMA 硬體自動化**
   - DMA 是 **獨立**於 CPU 的 **硬體控制器**，擁有 **直接存取記憶體匯流排的權限**
   - DMA 允許 外設(UART) 直接與記憶體 (SRAM) 交換資料
