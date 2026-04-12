@@ -6,7 +6,7 @@
 - [DMA (Direct Memory Access)：零CPU介入的資料搬運](#2-DMA-Direct-Memory-Access零CPU介入的資料搬運)
 - [Ring Buffer (循環緩衝區)：非同步生產者/消費者模型](#3-Ring-Buffer-循環緩衝區非同步生產者消費者模型)
 - [IDLE Line Detection (空閒線路偵測)：處理 非固定長度封包](#4-IDLE-Line-Detection-空閒線路偵測處理-非固定長度封包)
-- [雙重流控機制 (Flow Control)：高負載下的資料零遺失與自癒能力](#5-雙重流控機制-Flow-Control高負載下的資料零遺失與自癒能力)
+- [Flow Control 雙重流控機制：高負載下的資料零遺失與自癒能力](#5-Flow-Control-雙重流控機制高負載下的資料零遺失與自癒能力)
 - [SysTick 時基系統：非阻塞式任務調度](#6-SysTick-時基系統非阻塞式任務調度)
 #### [硬體環境設置](#二硬體環境設置)
 #### [韌體實作細節 (Firmware)](#三韌體實作細節-Firmware)
@@ -152,7 +152,7 @@
   - 即使 `My_Delay_ms(2000)` 讓 CPU 錯過了 IDLE 觸發的瞬間，CPU 醒來後依然可以透過指標判斷將資料領走，而 `rx_idle_event` 則作為一種 **主動喚醒** 的高效機制
 
 
-### (5) 雙重流控機制 (Flow Control)：高負載下的資料零遺失與自癒能力
+### (5) Flow Control 雙重流控機制：高負載下的資料零遺失與自癒能力
 在非同步通訊中，當 **發送端速度 > 接收端處理速度** 時，會發生嚴重的 **資料溢位**，透過 硬體 與 軟體 的雙重守護，構建穩健的通訊鏈路
 - **第一層防護 ： 硬體級流控 (Hardware Flow Control, RTS/CTS)** ： 直接在物理層運作，使用 **RTS (Request To Send)** 訊號
   - 當 STM32 負責接收的 FIFO 或 Buffer 接近滿載時，STM32 硬體會自動將其 **`PA12` (RTS)** 腳位拉高
