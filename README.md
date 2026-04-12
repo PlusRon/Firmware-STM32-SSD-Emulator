@@ -105,11 +105,12 @@ Firmware-STM32-SSD-Emulator
 
 ## 四、自動化建置系統 STM32 Makefile 
 為 STM32 (Cortex-M0) 建置一套具備 **增量編譯 (Incremental Build)**、**空間優化 (Space Optimization)** 與 **OpenOCD一鍵燒錄** 功能的 Makefile
+- #### [Makefile 兩階段編譯、燒入實作](README_FILE/makefile.md)
 - #### 核心硬體觀念：32 位元處理器與 16 位元指令
   - **32 位元處理器 (Cortex-M0)** ： 指的是 **資料寬度**。暫存器與 ALU 都是 32-bit，運算範圍達 $0$ 到 $2^{32}-1$
   - **16 位元指令集 (Thumb)** ： 指的是 **指令長度**。為了提高 **代碼密度 (Code Density)**，在有限的 Flash 空間內塞入更多指令
   - 運作原理 ： CPU 內部的 **指令解碼器 (Instruction Decoder)** 會在執行瞬間將 **16-bit Thumb 指令解譯為 32-bit** 的運算動作，兼顧空間與效能
-- #### [Makefile 兩階段編譯、燒入實作](README_FILE/makefile.md)
+
 
 
 
