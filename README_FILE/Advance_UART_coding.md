@@ -14,7 +14,7 @@
     DMA1->CH[2].CMAR = (uint32_t)rx_buffer;      // 記憶體位址：指向我們定義的 Ring Buffer
     ```
     - **CPAR (Channel Peripheral Address Register)** ： 固定指向 UART 的接收口，即 外設 (Peripheral)
-    - **CMAR (Channel Memory Address Register)** ： 指向存放資料的 ring buffer 陣列的起始位址，即 記憶體 (Memory)
+    - **CMAR (Channel Memory Address Register)** ： 指向存放資料的 Ring Buffer 陣列的起始位址，即 記憶體 (Memory)
   - **DMA 監聽 UART 的接收請求(Request)**　： UART 的資料準備好會發送通知給 DMA，背景下 DMA 直接將資料從 `USART->RDR` 搬運到自定義的 **SRAM 緩衝區**
 
     ```
@@ -22,8 +22,8 @@
     USART1->CR3 = (1UL << 6) | (1UL << 8);
     ```
     - **Bit 6 (DMAR, DMA Enable Receiver)**
-    - DMA 硬體會直接偵測 RXNE 訊號，只要 RXNE 為 `1`，瞬間把資料從 `USART1->RDR` 搬到 `rx_buffer`，然後自動清空 RXNE 為 `0`
     - 告訴 UART 硬體，當 **RXNE 變成 1 (接收暫存器非空)** 時，立刻發出一個 **DMA 請求 (DMA Request)** 給 DMA 控制器
+    - DMA 硬體會直接偵測 RXNE 訊號，只要 RXNE 為 `1`，瞬間把資料從 `USART1->RDR` 搬到 `rx_buffer`，然後自動清空 RXNE 為 `0`
     - 沒這行，UART 就算收到資料，也只會等待 CPU 來讀 (即 所提及的中斷內搬移)，而不會通知 DMA
   - **控制暫存器配置 (CCR)**
 
