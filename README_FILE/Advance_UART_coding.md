@@ -3,7 +3,11 @@
 ## Outline
 #### [理論、技術實作](#一理論技術實作)
 - [UART 模組：理論(含通訊工具)、硬體設置、韌體實作、除錯驗證](#1-UART-模組理論含通訊工具硬體設置韌體實作除錯驗證)
-- [(2) DMA (Direct Memory Access) - 零 CPU 介入的資料搬運](#2-DMA-Direct-Memory-Access零CPU介入的資料搬運)
+- [DMA (Direct Memory Access)：零CPU介入的資料搬運](#2-DMA-Direct-Memory-Access零CPU介入的資料搬運)
+- [Ring Buffer (循環緩衝區)：非同步生產者/消費者模型](#3-Ring-Buffer-循環緩衝區非同步生產者消費者模型)
+- [IDLE Line Detection (空閒線路偵測)：處理 非固定長度封包](#4-IDLE-Line-Detection-空閒線路偵測處理-非固定長度封包)
+- [(5) 雙重流控機制 (Flow Control)：高負載下的資料零遺失與自癒能力](#5-雙重流控機制-Flow-Control高負載下的資料零遺失與自癒能力)
+- [(6) SysTick 時基系統：非阻塞式任務調度](#6-SysTick-時基系統非阻塞式任務調度)
 #### [硬體環境設置](#二硬體環境設置)
 #### [韌體實作細節 (Firmware)](#三韌體實作細節-Firmware)
 #### [除錯與驗證 (Troubleshooting)](#四除錯與驗證-Troubleshooting)
@@ -58,7 +62,7 @@
     - 用 **總長度 - 剩餘計數(CNDTR)**，精確換算出 `wr_ptr`（算出隱藏在硬體內部的 write pointer，即 `MINC = 1` 所創建的指標）
     - 使軟體中的 `rd_ptr` 能夠精確地追蹤硬體中 Buffer 內的存放狀態
 
-### (3) Ring Buffer (循環緩衝區) — 非同步生產者/消費者模型
+### (3) Ring Buffer (循環緩衝區)：非同步生產者/消費者模型
 透過 **兩個指標 (`rd_ptr` 與 `wr_ptr`)** 並 設定 **DMA 硬體循環模式(Circular Mode)**，達到 Ring Buffer
 - **生產者 / 消費者模型**
   - **DMA** 作為 **生產者**(負責寫入)，**CPU** 作為 **消費者**(負責讀取)，只要 **消費者讀取速度快於生產者寫入速度**，緩衝區就能源源不絕的運作
@@ -107,7 +111,7 @@
   ```
   - 高流量下，進入 `while-loop` 處理 50 個字元的期間，DMA 可能又寫入了 20 個字
   - 必須在迴圈末端動態更新 `wr_ptr`，而 `rd_ptr` 會像 追隨者 一樣不斷消耗 Ring Buffer 內的新進資料，直到緩衝區真正被清空為止，極大地降低了中斷觸發次數與封包延遲 
-### (4) IDLE Line Detection (空閒線路偵測) - 處理 非固定長度封包
+### (4) IDLE Line Detection (空閒線路偵測)：處理 非固定長度封包
 - 當 UART 的 RX 線路接收完一個 Byte 後，其 **ISR (Interrupt State) 偵測到 IDLE 狀態** 維持在 **高電平超過一個 Byte 的時間(無傳輸)**，硬體就會自動將 IDLE 旗標置 `1`
 - 能精確在 一波資料 **傳送結束的瞬間通知 CPU**，適合處理長度不一的封包 (EX. AT 指令、自定義協議)
 - #### 硬體中斷配置
@@ -148,7 +152,7 @@
   - 即使 `My_Delay_ms(2000)` 讓 CPU 錯過了 IDLE 觸發的瞬間，CPU 醒來後依然可以透過指標判斷將資料領走，而 `rx_idle_event` 則作為一種 **主動喚醒** 的高效機制
 
 
-### (5) 雙重流控機制 (Flow Control) - 高負載下的資料零遺失與自癒能力
+### (5) 雙重流控機制 (Flow Control)：高負載下的資料零遺失與自癒能力
 在非同步通訊中，當 **發送端速度 > 接收端處理速度** 時，會發生嚴重的 **資料溢位**，透過 硬體 與 軟體 的雙重守護，構建穩健的通訊鏈路
 - **第一層防護 ： 硬體級流控 (Hardware Flow Control, RTS/CTS)** ： 直接在物理層運作，使用 **RTS (Request To Send)** 訊號
   - 當 STM32 負責接收的 FIFO 或 Buffer 接近滿載時，STM32 硬體會自動將其 **`PA12` (RTS)** 腳位拉高
@@ -200,7 +204,7 @@
     |目標|避免 Buffer 滿載|處理突發異常，確保指標對齊|
     |對手|高速資料流|系統當機、干擾、協議失效|
     
-### (6) SysTick 時基系統 - 非阻塞式任務調度
+### (6) SysTick 時基系統：非阻塞式任務調度
 SysTick (System Tick Timer) 能在 **不使用即時作業系統(RTOS)** 的情況下，依然能精確 **管理多個併行任務**。`SysTick` 是內建於 ARM Cortex-M 核心內的一個 **24 位元遞減計數器**，是為了提供一個穩定的 **心跳 (Heartbeat)**，讓系統擁有統一的 ms 級 時間戳記，實現非阻塞式的定時任務
 - #### 硬體初始化與頻率換算
 
