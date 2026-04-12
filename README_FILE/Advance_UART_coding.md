@@ -15,6 +15,10 @@
 - [周邊、暫存器、位元 (Bit) 控制](#周邊暫存器位元-Bit-控制)
 - [程式碼](#程式碼)
 #### [除錯與驗證 (Troubleshooting)](#四除錯與驗證-Troubleshooting)
+- [模組迴圈測試 (Loopback Test)](#模組迴圈測試-Loopback-Test)
+- [硬體物理排查](#硬體物理排查)
+- [指令級強制測試，跳過 Minicom (Bypass Minicom)](#指令級強制測試跳過-Minicom-Bypass-Minicom)
+- [交叉驗證邏輯](#交叉驗證邏輯)
 
 ## 一、理論、技術實作
 ### [(1) UART 硬體介紹(含通訊工具)、硬體設置、韌體實作、除錯驗證](UART_introduce.md)
