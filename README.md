@@ -4,6 +4,7 @@ Firmware-STM32-SSD-Emulator
 ## Outline
 #### [ 一、開發環境 (Environment Setup)](#一開發環境-Environment-Setup)
 #### [二、STM32硬體啟動流程 (Startup Procedure)](#二STM32硬體啟動流程-Startup-Procedure)
+#### [三、主程式碼實作 (Implementation)](#三主程式碼實作-Implementation)
 
 ## 一、開發環境 (Environment Setup)
 本專案捨棄笨重的 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
