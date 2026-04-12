@@ -143,27 +143,50 @@
 
 ### 雙重流控機制 (Flow Control) - 高負載下的資料零遺失與自癒能力
 在非同步通訊中，當 **發送端速度 > 接收端處理速度** 時，會發生嚴重的 **資料溢位**，透過 硬體 與 軟體 的雙重守護，構建穩健的通訊鏈路
-- #### 第一層防護 ： 硬體級流控 (RTS/CTS)
-- 硬體流控 (Hardware Flow Control)，直接在物理層運作，使用 **RTS (Request To Send)** 訊號
-  - 當 STM32 接收的 FIFO 或 Buffer 接近滿載時，硬體會自動將 **`PA12` (RTS)** 腳位拉高
-  - 發送端（電腦）偵測到其 **CTS (Clear To Send)** 線變為高電位後，會立即停止物理性發送，直到 STM32 處理完資料並拉低 RTS 為止
-- GPIO 配置
+- **第一層防護 ： 硬體級流控 (Hardware Flow Control, RTS/CTS)** ： 直接在物理層運作，使用 **RTS (Request To Send)** 訊號
+  - 當 STM32 負責接收的 FIFO 或 Buffer 接近滿載時，STM32 硬體會自動將其 **`PA12` (RTS)** 腳位拉高
+  - 發送端（電腦）偵測到其 USB to TTL 模組的 **CTS (Clear To Send, 連接到 STM32 的 RTS)** 線變為高電位後，會立即停止物理性發送，直到 STM32 處理完資料並拉低 RTS 為止
+  - **GPIO 配置**
+    ```
+    // (3) 硬體流控：加入 PA12 作為 RTS 腳位
+    GPIOA->MODER |= (2UL << 24); // 設定為 Alternate Function 模式
+    GPIOA->AFRH  |= (1UL << 16); // 指向 AF1 (USART1_RTS)
+    ```
+  - **外設控制**
 
-  ```
-  // (3) 硬體流控：加入 PA12 作為 RTS 腳位
-  GPIOA->MODER |= (2UL << 24); // 設定為 Alternate Function 模式
-  GPIOA->AFRH  |= (1UL << 16); // 指向 AF1 (USART1_RTS)
-  ```
-- 外設控制
+    ```
+    USART1->CR3 |= (1UL << 8); // 啟動 RTSE (RTS Enable) 位元
+    ```
+    - 設定完成後，**RTS 的電位切換** 完全 **由 UART 硬體控制器自動管理**，不佔用任何 CPU 週期
+- **第二層防護：軟體級容錯與自癒 (ORE & NACK)** ： 災難偵測 並 重新同步
+  - 即使有硬體流控，若通訊線路不穩 或 雜訊導致硬體無法及時反應，仍可能發生 **Overrun Error (ORE)**，因此系統必須具備 **自我修復(Self-healing)** 能力
+  - **捕捉 ORE 異常** ： 當 **硬體流控失敗導致 Overrun Error (ORE)** 發生時，STM32 硬體會鎖死接收暫存器，必須在中斷中立即解鎖
 
-  ```
-  USART1->CR3 |= (1UL << 8); // 啟動 RTSE (RTS Enable) 位元
-  ```
-  - 設定完成後，**RTS 的電位切換** 完全 **由 UART 硬體控制器自動管理**，不佔用任何 CPU 週期
+    ```
+    void USART1_IRQHandler(void) {
+        if (USART1->ISR & (1UL << 3)) {   // 偵測到 ORE 旗標
+            USART1->ICR = (1UL << 3);     // 手動清除旗標，重啟硬體接收
+            uart_overrun_occurred = 1;    // 標記軟體狀態
+        }
+    }
+    ```
+    - 透過 **`USART1_IRQHandler` 捕捉異常**
+  - **NACK 重傳機制與指標對齊 (Disaster Recovery)**
+    ```
+    if (uart_overrun_occurred) {
+        uart_overrun_occurred = 0;
+        UART_SendChar(ASCII_NAK); // 發送 0x15 (NAK) 告知對端：資料遺失，請重發
+        UART_Send("\r\n[NACK] Overflow Detected!\r\n");
+        
+        // 強制指標同步：放棄受損的殘餘資料，將讀取指標對準當前 DMA 寫入點
+        rd_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR; 
+    }
+    ```
+    - 發送 `0x15 (NAK)` 訊號請求重傳，同時強制同步指標（Disaster Recovery）
+    - 當資料流出錯時，最危險的是 **指標偏移** 導致 **後續所有封包解析錯位**
+    - 透過強制將 `rd_ptr` 對齊硬體的 `wr_ptr`，實現秒級重啟通訊
 
-- 為了確保在高負載下的資料完整性，系統實施了兩層保護：
-  - 硬體層 (RTS/CTS)：透過 PA12 (RTS) 腳位，由硬體自動控制發送端的節奏。當 Buffer 快滿時，硬體會物理性地讓對方停止傳送。
-  - 軟體層 (ORE Detection & NACK)：若硬體流控失敗導致 Overrun Error (ORE)，系統會透過 USART1_IRQHandler 捕捉異常，並發送 0x15 (NAK) 訊號請求重傳，同時強制同步指標（Disaster Recovery）。
+  
 ### 6. SysTick 時基系統
 - 理論：內建於 Cortex-M 核心的遞減計數器。
 - 關聯：提供精確的 ms 等級時間戳，用於實現非阻塞式的定時任務（如本專案中的 LED 定時翻轉）
