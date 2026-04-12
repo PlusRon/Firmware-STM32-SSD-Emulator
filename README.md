@@ -3,7 +3,7 @@ Firmware-STM32-SSD-Emulator
 
 ## Outline
 #### [ 一、開發環境 (Environment Setup)](#一開發環境-Environment-Setup)
-#### [二、硬體 (STM32) 啟動流程 (Start-up Procedure)](二硬體-STM32-啟動流程-Start-up-Procedure)
+#### [二、硬體 (STM32) 啟動流程 (Startup Procedure)](二硬體-STM32-啟動流程-Startup-Procedure)
 
 ## 一、開發環境 (Environment Setup)
 本專案捨棄笨重的 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
@@ -19,7 +19,7 @@ Firmware-STM32-SSD-Emulator
   |**燒錄、除錯 (Flashing & Debugging)** | **OpenOCD**|
 - #### [Linux to STM32 開發環境建置](README_FILE/environment_setup.md)
 
-## 二、硬體 (STM32) 啟動流程 (Start-up Procedure)
+## 二、硬體 (STM32) 啟動流程 (Startup Procedure)
 - #### 查閱核心開發文件
   |查找目標|建議手冊|關鍵章節 (Keywords)|
   |:---:|:---|:---|
