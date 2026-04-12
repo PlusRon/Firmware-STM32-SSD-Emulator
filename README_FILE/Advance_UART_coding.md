@@ -329,13 +329,14 @@ void LED_Toggle(uint8_t *state) {
 /* --- UART and DMA --- */
 void USART1_IRQHandler(void) {
     // check IDLE
-    if (USART1->ISR & (1UL << 4)) {
-        USART1->ICR = (1UL << 4);
-        rx_idle_event = 1;
+    if (USART1->ISR & (1UL << 4)) { // Bit-4 : IDLE occur when IDLE-state is true
+        USART1->ICR = (1UL << 4);   // Bit-4 : IDLE-state be cleared
+        rx_idle_event = 1;          // IDLE event will be trigger
     }
+
     // check ORE (Overrun)
-    if (USART1->ISR & (1UL << 3)) {
-        USART1->ICR = (1UL << 3);
+    if (USART1->ISR & (1UL << 3)) { // Bit-3 : ORE occur when ORE-state is true
+        USART1->ICR = (1UL << 3);   // Bit-3 : ORE-state be cleared
 
         // No logic is handled here; the NACK process is delegated to the main function.
         uart_overrun_occurred = 1;      // (Mark) to tell main() that something just happened (ORE)
@@ -344,8 +345,8 @@ void USART1_IRQHandler(void) {
 
 void UART_Send(char *s) {
     while (*s) {
-        while (!(USART1->ISR & (1UL << 7)));
-        USART1->TDR = *s++;
+        while (!(USART1->ISR & (1UL << 7)));  // Bit-7 : stuck here when TxE-state is false (previous data hasn't been fully transmitted yet)
+        USART1->TDR = *s++;                   // Bit-7 : transmitted the next data when TxE-state is true
     }
 }
 
@@ -355,8 +356,8 @@ void UART_SendChar(uint8_t c) {
 }
 
 void My_Delay_ms(uint32_t ms) {
-    uint32_t start = get_tick();
-    while ((get_tick() - start) < ms);
+    uint32_t start = get_tick();         // now time
+    while ((get_tick() - start) < ms);   // stuck ms
 }
 
 /* --- System initialization --- */
@@ -389,7 +390,8 @@ void System_Init(void) {
     
     // 7. CR3 Modification: Added RTSE (Bit 8) to enable hardware flow control.
     USART1->CR3 = (1UL << 6) | (1UL << 8); 
-    
+
+    // Bit-0 : UART EN , Bit-3 : Tx EN , Bit-2 : Rx EN  , Bit-4 : IDLE EN
     USART1->CR1 = (1UL << 0) | (1UL << 3) | (1UL << 2) | (1UL << 4);
 
     // 8. NVIC and SysTick
