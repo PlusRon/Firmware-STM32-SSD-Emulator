@@ -30,15 +30,15 @@
     ```
     DMA1->CH[2].CCR = (1UL << 7) | (1UL << 5) | (1UL << 0);
     ```
-    - **MINC (Bit 7)** ： **記憶體位址增量** 模式，確保每搬一個字元，目的地位址會自動 `+1`
-    - **CIRC (Bit 5)** ： **循環模式 (Circular Mode)**，實現不斷電、不停機接收的關鍵，讓 **緩衝區首尾相連**
-    - **EN (Bit 0)** ： 啟動通道
+    - **MINC (Bit 7)** ： **記憶體位址增量** 模式，確保每搬一個 **字元 (Byte)**，目的地位址會自動 `+1` (硬體內部的 write **pointer**)
+    - **CIRC (Bit 5)** ： **循環模式 (Circular Mode)**，實現不斷電、不停機接收的關鍵，讓 **緩衝區首尾相連**，形成 Ring Buffer
+    - **EN (Bit 0)** ： 啟動 通道 (Channel)
   - **傳輸長度** 與 **循環模式**
 
     ```
     DMA1->CH[2].CNDTR = RX_BUF_SIZE; // 設定緩衝區總長度 (1024)
     ```
-    - `CNDTR` 是 **DMA 的下數計數暫存器** (buffer 剩餘的空間)
+    - `CNDTR` 是 **DMA 的下數計數暫存器** (Buffer 剩餘的空間)
     - 每搬運完一個 Byte，該值會自動遞減 (RXNE 由 `1` 變 `0` 提供給 Flip-Flop 的負緣觸發驅動)
     - 當遞減到 0 時，因為已啟用 **循環模式（Circular Mode）**，會自動重新載入 `RX_BUF_SIZE` 並回到緩衝區開頭開始寫入 (利用 Flip-Flop 的 CLR 和 Reset)
     - 
@@ -47,9 +47,9 @@
     ```
     uint16_t wr_ptr = RX_BUF_SIZE - (uint16_t)DMA1->CH[2].CNDTR;
     ```
-    - CNDTR 是遞減計數器
-    - 用 **總長度 - 剩餘計數(CNDTR)**，精確換算出 `wr_ptr`（算出隱藏在硬體內部的寫入指標，即 `MINC = 1` 所創建的指標）
-    - 使軟體中的 `rd_ptr` 能夠精確地追蹤硬體中 buffer 內的存放狀態
+    - CNDTR 是 **遞減計數** 器
+    - 用 **總長度 - 剩餘計數(CNDTR)**，精確換算出 `wr_ptr`（算出隱藏在硬體內部的 write pointer，即 `MINC = 1` 所創建的指標）
+    - 使軟體中的 `rd_ptr` 能夠精確地追蹤硬體中 Buffer 內的存放狀態
 
 ### 3. Ring Buffer (循環緩衝區)
 - 理論：一種首尾相連的緩衝結構。DMA 在記憶體中以 Circular Mode 運作。
