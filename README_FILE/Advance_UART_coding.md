@@ -141,7 +141,11 @@
   - 即使 `My_Delay_ms(2000)` 讓 CPU 錯過了 IDLE 觸發的瞬間，CPU 醒來後依然可以透過指標判斷將資料領走，而 `rx_event` 則作為一種 **主動喚醒** 的高效機制
 
 
-### 雙重流控機制 (Flow Control)
+### 雙重流控機制 (Flow Control) - 高負載下的資料零遺失與自癒能力
+在非同步通訊中，當 **發送端速度 > 接收端處理速度** 時，會發生嚴重的 **資料溢位**，透過 硬體 與 軟體 的雙重守護，構建穩健的通訊鏈路
+- #### 第一層防護 ： 硬體級流控 (RTS/CTS)
+硬體流控 (Hardware Flow Control)，直接在物理層運作，使用 **RTS (Request To Send)** 訊號
+
 - 為了確保在高負載下的資料完整性，系統實施了兩層保護：
   - 硬體層 (RTS/CTS)：透過 PA12 (RTS) 腳位，由硬體自動控制發送端的節奏。當 Buffer 快滿時，硬體會物理性地讓對方停止傳送。
   - 軟體層 (ORE Detection & NACK)：若硬體流控失敗導致 Overrun Error (ORE)，系統會透過 USART1_IRQHandler 捕捉異常，並發送 0x15 (NAK) 訊號請求重傳，同時強制同步指標（Disaster Recovery）。
