@@ -11,7 +11,7 @@ LOG_FILE = $(LOG_DIR)/flash_$(shell date +%Y%m%d_%H%M%S).log
 
 
 # [Step 1] 自動化搜尋抓取所有的 .c 檔案清單
-SRCS = $(wildcard app/*.c) $(wildcard hw/*.c)
+SRCS = $(wildcard app/*.c) $(wildcard hw/*.c) $(wildcard drivers/*.c)
 
 # [Step 2] 自動化轉換使用 patsubst 把 .c 清單轉換成對應的 .o 檔案清單，並放入 build 目錄 (app/main.c -> build/app/main.o)
 # 邏輯：將 "app/main.c" 轉為 "build/app/main.o"

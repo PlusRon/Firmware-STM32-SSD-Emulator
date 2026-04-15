@@ -1,4 +1,4 @@
-#include "include/systick.h"
+#include "systick.h"
 
 // static 只能放在 .c，因為作用在全域變數時，為這份檔案私有
 static volatile uint32_t msTicks = 0; // 8000 clock as a 1ms(1 Tick)

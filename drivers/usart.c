@@ -1,4 +1,10 @@
-#include "include/usart.h"
+#include "usart.h"
+
+
+
+// 必須在這裡「定義」變數實體，不能只有 .h 的 extern
+volatile uint8_t rx_idle_event = 0;
+volatile uint8_t uart_overrun_occurred = 0;
 
 /* --- UART and DMA --- */
 void USART1_IRQHandler(void)

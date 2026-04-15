@@ -1,4 +1,4 @@
-#include "include/gpio.h"
+#include "gpio.h"
 
 /**
  * @brief 彈性初始化指定 GPIO 上的引腳為輸出模式
@@ -27,7 +27,7 @@ void GPIO_Init_AF(GPIO_TypeDef *GPIOx, uint8_t pin, uint8_t af_num)
 {
     /* 1. 開啟時鐘 */
     uint32_t port_bit_offset = ((uint32_t)GPIOx - GPIOA_BASE) >> 10;
-    RCC->AHBENR |= (1UL << 17 + port_bit_offset);
+    RCC->AHBENR |= (1UL << (17 + port_bit_offset));
 
     /* 2. 設定 MODER 為 10 (Alternate Function) */
     GPIOx->MODER &= ~(3UL << (pin << 1)); // clear Mode

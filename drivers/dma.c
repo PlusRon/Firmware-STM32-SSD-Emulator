@@ -1,4 +1,4 @@
-#include "include/dma.h"
+#include "dma.h"
 
 /**
  * @brief  初始化 DMA 通道 (使用 DMAx 指標與通道索引)

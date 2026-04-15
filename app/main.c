@@ -1,8 +1,8 @@
 #include "stm32f072xb.h"
-#include "include/gpio.h"
-#include "include/systick.h"
-#include "include/dma.h"
-#include "include/usart.h"
+#include "gpio.h"
+#include "systick.h"
+#include "dma.h"
+#include "usart.h"
 
 /* --- MACRO define --- */
 #define RX_BUF_SIZE 1024 // Increasing the buffer size to 1024, significantly reduces the probability of ORE
