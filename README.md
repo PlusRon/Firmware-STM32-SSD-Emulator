@@ -15,7 +15,7 @@
 - [應用邏輯層：GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](#GPIO-原子性操作-BSRRSysTick-非阻塞時基系統)
 - [應用邏輯層：UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](#UART-非阻斷式非同步收發資料處理-UARTDMARing-BufferIDLEFlow-ControlSystem-Tick)
 #### [自動化建置系統 STM32 Makefile](#四自動化建置系統-STM32-Makefile)
-#### [非侵入式除錯 (Non-intrusive Debugging)](#五非侵入式除錯-Non-intrusive-Debugging)
+#### [除錯 (Debugging)](#五除錯-Debugging)
 
 ## 一、開發環境 (Environment Setup)
 本專案捨棄笨重的 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
@@ -127,7 +127,8 @@
   - **16 位元指令集 (Thumb)** ： 指的是 **指令長度**。為了提高 **代碼密度 (Code Density)**，在有限的 Flash 空間內塞入更多指令
   - 運作原理 ： CPU 內部的 **指令解碼器 (Instruction Decoder)** 會在執行瞬間將 **16-bit Thumb 指令解譯為 32-bit** 的運算動作，兼顧空間與效能
 
-## 五、非侵入式除錯 (Non intrusive Debugging)
+## 五、除錯 (Debugging)
+- #### [非侵入式除錯 (Non-intrusive Debugging)](README_FILE/Non-intrusive_Debugging.md)
 
 
 
