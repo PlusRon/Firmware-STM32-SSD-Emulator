@@ -36,12 +36,12 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
   ```
 - 進入 GDB 畫面後，輸入以下 GDB 指令
 
-  - 連接到 OpenOCD (剛才那個 3333 埠)
+  - **連接到 OpenOCD** (剛才那個 3333 埠)
     ```
     (gdb) target remote :3333
     ```
     - 告訴 GDB，除錯目標不在這台電腦，而是在網路埠 `3333` 的那顆晶片上
-  - 重置並停在開機第一行
+  - **重置並停在開機第一行**
     ```
     (gdb) monitor reset halt    # 讓晶片重啟並停在開機第一行
     ```
@@ -54,7 +54,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
       |`monitor halt`|強制停止 CPU（不重置，直接凍結現況）|
       |`monitor resume`|恢復執行（類似 GDB 的 continue，但有時在 OpenOCD 層級操作更直接）|
       |`monitor flash erase_sector 0 0 7`|叫 OpenOCD 去擦除 Flash 特定區塊（GDB 本身無法直接操作 Flash 擦除）|
-  - 檢查啟動位址 (pc) 與 堆疊指標 (msp)，查看初始指標
+  - **檢查啟動位址 (pc) 與 堆疊指標 (msp)**，查看初始指標
     ```
     (gdb) i r pc msp
     ```
@@ -66,12 +66,12 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
     (gdb) load    # 如果你剛編譯完，這會直接把 code 燒進去
     ```
     - 將電腦上的 `.elf` 檔案寫入 STM32 的 Flash
-  - 下斷點
+  - **下斷點**
     ```
     (gdb) b main
     ```
     - 在 main 函式的開頭放置 攔截點
-  - 讓程式繼續跑 (全速執行)
+  - **讓程式繼續跑** (全速執行)
     ```
     (gdb) continue
     ```
@@ -80,7 +80,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 
       1. 如果程式直接卡住沒反應，就證實了 printf 內部發生死循環
       2. 按下 **Ctrl + C**，強制暫停
-  - 檢查當機點
+  - **檢查當機點**
     ```
     (gdb) backtrace    # 縮寫 bt
     ```
