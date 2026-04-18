@@ -1,5 +1,5 @@
 # 非侵入式除錯 (Non-intrusive Debugging)
-直接利用 ST-Link (Mini USB) 透視晶片的大腦
+直接利用 ST-Link (Mini USB) 透視晶片的大腦；編譯器（GCC）負責產生代碼，而除錯器（GDB）負責控制 CPU
 
 ## 一、環境準備
 ### 安裝 GDB 多架構版
@@ -8,17 +8,23 @@
 sudo apt update
 sudo apt install gdb-multiarch
 ```
+- 一般的 `gdb` 是用來除錯電腦 (x86) 程式的
+- `gdb-multiarch` 支援 ARM 架構 (STM32 用的 Cortex-M0)，能理解 ARM 的指令集與暫存器結構
+
 ### 安裝後，後續可使用此指令啟動 (取代原本的 `arm-none-eabi-gdb`)：
 ```
 gdb-multiarch build/project.elf
 ```
+- 啟動 GDB 並讀取 **符號表**
+- `.elf` 檔案除了包含機器碼，還包含 **地圖訊息**（哪一行 C 代碼對應哪個記憶體位址），沒有這個檔案，GDB 只能看到一堆 0 和 1 的機械碼
 
 ## 二、非侵入式除錯步驟
-### (1) 準備 OpenOCD (後端橋樑)
+### (1) 準備 OpenOCD (後端橋樑，硬體與軟體的翻譯官)
 確保板子已連上電腦，並另外開啟一個終端機視窗執行。**視窗必須一直開著，不要關掉**
 ```
 openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 ```
+- 啟動 OpenOCD 並指定 **硬體介面 (ST-Link)** 與 **目標晶片 (STM32F0)**
 - 建立一個 GDB Server
 - 看到 `Listening on port 3333 for gdb connections` 代表成功
 
