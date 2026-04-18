@@ -37,7 +37,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
     ```
     (gdb) monitor reset halt    # 讓晶片重啟並停在開機第一行
     ```
-  - 檢查啟動位址(pc) 與 堆疊指標(msp)
+  - 檢查啟動位址 (pc) 與 堆疊指標 (msp)，查看初始指標
     ```
     (gdb) i r pc msp
     ```
