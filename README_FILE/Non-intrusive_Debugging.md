@@ -93,7 +93,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 (gdb) print rd_ptr          # 印出目前的數值
 (gdb) print /x USART1->ISR  # 以 16 進位印出 UART 狀態暫存器 (看旗標很有用)
 ```
-- 直接讀取硬體暫存器
+- 直接讀取硬體的狀態暫存器 (Interrupt and Status Register, ISR)
 - 如果 printf 卡住，可以看 TXE 位元是否為 1。如果一直不是 1，代表硬體沒準備好發送資料
 ### (2) 動態監控 (Watchpoint)
 當變數被改變時，程式自動停下來
