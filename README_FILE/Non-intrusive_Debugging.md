@@ -37,6 +37,12 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
     ```
     (gdb) monitor reset halt    # 讓晶片重啟並停在開機第一行
     ```
+  - 檢查啟動位址(pc) 與 堆疊指標(msp)
+    ```
+    (gdb) i r pc msp
+    ```
+    - 正常數值：`pc` 應該在 `0x0800XXXX`，`msp` 應該在 `0x2000XXXX`（RAM 的位址）
+    - 狀況若為 `pc: 0xfffffffe` 代表 CPU 一開始就迷路了，通常是因為 Startup File (`startup.o`) 或 Linker Script 設定錯誤，導致**中斷向量表（Vector Table）沒有排在 Flash 的開頭**
   - 剛編譯完，該指令直接把 code 燒進去
     ```
     (gdb) load    # 如果你剛編譯完，這會直接把 code 燒進去
@@ -81,7 +87,21 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 ```
 (gdb) display rd_ptr        # 每次程式停下或手動下 Ctrl+C 時，都會自動顯示這個值
 ```
-## 四、GDB vs. printf
+## 四、強制跳轉到 Reset_Handler
+若 continue 沒反應，可以手動推它一把
+```
+(gdb) monitor reset halt
+(gdb) b Reset_Handler    # 這是程式真正的起點，在進入 main 之前
+(gdb) continue
+```
+- 如果能 **停在 `Reset_Handler`**，代表硬體沒壞，是 **啟動流程有問題**
+- 如果連 Reset_Handler 都進不去，那極有可能是 **Linker Script 的 Section 定義 出了問題**
+
+
+
+
+
+## 結論、GDB vs. printf
 |特性|Printf|GDB(SWD)|
 |:---|:---|:---|
 |**速度影響**|會變慢，甚至改變 Bug 的行為|幾乎無影響 (由硬體電路負責)|
