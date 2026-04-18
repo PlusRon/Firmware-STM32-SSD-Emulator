@@ -45,7 +45,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
     ```
     (gdb) monitor reset halt    # 讓晶片重啟並停在開機第一行
     ```
-    - `monitor` 指令是 **透傳(Pass-through)通道** ： 代表 後面指令不是給 GDB，要原封不動直接丟給後端的 OpenOCD 執行
+    - `monitor` 指令是 **透傳(Pass-through)通道** ： 代表 後面指令不是給 GDB，要原封不動直接丟給後端的 OpenOCD 執行 (跟硬體物理狀態有關的操作)
     - 重置晶片（Reset）並立刻凍結（Halt）
     - 確保 CPU 處於剛開機、最乾淨的狀態
       |指令|意義|
