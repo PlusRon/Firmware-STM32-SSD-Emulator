@@ -25,7 +25,8 @@ gdb-multiarch build/project.elf
 openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 ```
 - 啟動 OpenOCD 並指定 **硬體介面 (ST-Link)** 與 **目標晶片 (STM32F0)**
-- 建立一個 GDB Server
+- OpenOCD 扮演轉接頭。連接著 **USB 端的 GDB 協定 (Port 3333)** 與 **晶片端的 SWD 協定**
+- 在電腦端建立一個 **GDB Server**，連線到晶片並賦予 Port 3333
 - 看到 `Listening on port 3333 for gdb connections` 代表成功
 
 ### (2) 啟動 GDB (前端介面)
@@ -39,6 +40,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
     ```
     (gdb) target remote :3333
     ```
+    - 告訴 GDB，除錯目標不在這台電腦，而是在網路埠 `3333` 的那顆晶片上
   - 重置並停在開機第一行
     ```
     (gdb) monitor reset halt    # 讓晶片重啟並停在開機第一行
