@@ -29,12 +29,12 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 - 在電腦端建立一個 **GDB Server**，連線到晶片並賦予 Port 3333
 - 看到 `Listening on port 3333 for gdb connections` 代表成功
 
-### (2) 啟動 GDB (前端介面)
+### (2) 啟動 GDB (前端介面，掌控 CPU)
 - 開啟另一個終端機視窗，進入 **專案目錄**，啟動 GDB 並讀取你的程式地圖
   ```
   gdb-multiarch build/project.elf
   ```
-- 進入 GDB 畫面後，輸入以下指令
+- 進入 GDB 畫面後，輸入以下 GDB 指令
 
   - 連接到 OpenOCD (剛才那個 3333 埠)
     ```
