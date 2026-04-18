@@ -45,20 +45,25 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
     ```
     (gdb) monitor reset halt    # 讓晶片重啟並停在開機第一行
     ```
+    - 重置晶片（Reset）並立刻凍結（Halt）
+    - 確保 CPU 處於剛開機、最乾淨的狀態
   - 檢查啟動位址 (pc) 與 堆疊指標 (msp)，查看初始指標
     ```
     (gdb) i r pc msp
     ```
+    - PC (程式計數器) 是 CPU 現在執行到哪裡； MSP (主堆疊指標) 是記憶體在哪裡
     - 正常數值：`pc` 應該在 `0x0800XXXX`，`msp` 應該在 `0x2000XXXX`（RAM 的位址）
     - 狀況若為 `pc: 0xfffffffe` 代表 CPU 一開始就迷路了，通常是因為 Startup File (`startup.o`) 或 Linker Script 設定錯誤，導致**中斷向量表（Vector Table）沒有排在 Flash 的開頭**
   - 剛編譯完，該指令直接把 code 燒進去
     ```
     (gdb) load    # 如果你剛編譯完，這會直接把 code 燒進去
     ```
+    - 將電腦上的 `.elf` 檔案寫入 STM32 的 Flash
   - 下斷點
     ```
     (gdb) b main
     ```
+    - 在 main 函式的開頭放置 攔截點
   - 讓程式繼續跑 (全速執行)
     ```
     (gdb) continue
@@ -73,6 +78,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
     (gdb) backtrace    # 縮寫 bt
     ```
     - 輸入 `bt` (backtrace)，GDB 會直接秀出到底死在哪個函式的哪一行
+    - 回溯堆疊，抓出 Ctrl+C 時，程式死掉的點
 ## 三、查看變數 (Watch and Print)
 ### (1) 靜態查看 (程式暫停時)
 查看變數目前的數值
@@ -80,6 +86,8 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 (gdb) print rd_ptr          # 印出目前的數值
 (gdb) print /x USART1->ISR  # 以 16 進位印出 UART 狀態暫存器 (看旗標很有用)
 ```
+- 直接讀取硬體暫存器
+- 如果 printf 卡住，可以看 TXE 位元是否為 1。如果一直不是 1，代表硬體沒準備好發送資料
 ### (2) 動態監控 (Watchpoint)
 當變數被改變時，程式自動停下來
 ```
@@ -87,6 +95,7 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 (gdb) continue              # 讓程式繼續跑 (全速執行)
 ```
 - 程式會全速執行
+- 利用 ARM 硬體內部的監視器
 - 一旦有人改了 `rd_ptr` 的值，GDB 會立刻攔截訊號，讓程式停在那一行
 - 並顯示 **舊值** 與 **新值**
 
@@ -95,14 +104,16 @@ openocd -f interface/stlink.cfg -f target/stm32f0x.cfg
 ```
 (gdb) display rd_ptr        # 每次程式停下或手動下 Ctrl+C 時，都會自動顯示這個值
 ```
+- 每次下指令 `step`（走一步）或 `next`（走一行）時，會自動把變數印在螢幕上，不用重複輸入 print
 ## 四、強制跳轉到 Reset_Handler
 若 continue 沒反應，可以手動推它一把
 ```
 (gdb) monitor reset halt
-(gdb) b Reset_Handler    # 這是程式真正的起點，在進入 main 之前
+(gdb) b Reset_Handler    # 這是STM32 程式真正的起點，在進入 main 之前
 (gdb) continue
 ```
-- 如果能 **停在 `Reset_Handler`**，代表硬體沒壞，是 **啟動流程有問題**
+- Reset_Handler 負責初始化系統時鐘、複製 Data 段、清空 BSS 段
+- 如果能 **停在 `Reset_Handler`** 卻進不去 main，代表硬體沒壞，是 **啟動流程有問題**，說明系統在初始化記憶體或時鐘時就崩潰了（通常是時鐘頻率設得太離譜，導致晶片當機）
 - 如果連 Reset_Handler 都進不去，那極有可能是 **Linker Script 的 Section 定義 出了問題**
 
 
