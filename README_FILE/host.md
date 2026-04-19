@@ -152,3 +152,205 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
 - **Main Loop** ：發現 `rd_ptr != wr_ptr`，STM32 開始掃描讀取 RING BUFFER
 - **Protocol Parser** ：看到 `0xA5`，檢查 **Checksum**
 - **觸發斷點** ：如果封包正確，CPU 會停在 `handle_nvme_read`
+
+
+#### protocol.h
+```
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
+
+#include <stdint.h>
+
+/* --- 協定常數定義 --- */
+#define CMD_START_BYTE 0xA5
+#define PKT_SIZE       7    // Start(1)+Op(1)+LBA(2)+Len(2)+CS(1)
+
+/* --- NVMe Opcode 模擬 --- */
+#define NVME_OP_READ     0x01
+#define NVME_OP_WRITE    0x02
+#define NVME_OP_IDENTIFY 0x03
+
+/* --- 封包結構體 --- */
+// 使用 packed 確保結構體不被填充，大小精確為 7 Bytes
+typedef struct __attribute__((packed)) {
+    uint8_t  start_byte; // 0xA5
+    uint8_t  opcode;     
+    uint16_t lba;        
+    uint16_t length;     
+    uint8_t  checksum;   
+} NVMe_Command_t;
+
+/* --- 函式宣告 --- */
+void Protocol_Parse(uint8_t *packet_buf);
+void handle_nvme_read(uint16_t lba);
+void handle_nvme_write(uint16_t lba);
+
+#endif
+```
+
+#### protocol.c
+```
+#include "protocol.h"
+
+/**
+ * @brief 解析指令封包
+ * @param packet_buf 指向接收緩衝區中 A5 開頭的位址
+ */
+void Protocol_Parse(uint8_t *packet_buf) {
+    NVMe_Command_t *cmd = (NVMe_Command_t *)packet_buf;
+
+    // 1. 再次確認起始位元 (雙重檢查)
+    if (cmd->start_byte != CMD_START_BYTE) return;
+
+    // 2. 實作 Checksum 驗證
+    uint8_t calculated_cs = 0;
+    for (int i = 0; i < PKT_SIZE - 1; i++) {
+        calculated_cs += packet_buf[i];
+    }
+
+    // 只有校驗通過，才執行指令
+    if (calculated_cs == cmd->checksum) {
+        
+        // 3. 位元組序轉換 (Big-endian from Python to Little-endian for STM32)
+        uint16_t lba = (uint16_t)__builtin_bswap16(cmd->lba);
+        
+        switch (cmd->opcode) {
+            case NVME_OP_READ:
+                handle_nvme_read(lba);
+                break;
+            case NVME_OP_WRITE:
+                handle_nvme_write(lba);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+/* 這是 stub functions (樁函式)，專門給 GDB 下斷點觀察 lba 數值 */
+void handle_nvme_read(uint16_t lba) {
+    // GDB 斷點位置: b handle_nvme_read
+    __asm("NOP"); 
+}
+
+void handle_nvme_write(uint16_t lba) {
+    // GDB 斷點位置: b handle_nvme_write
+    __asm("NOP");
+}
+```
+#### main.c
+```
+#include "stm32f072xb.h"
+#include "gpio.h"
+#include "systick.h"
+#include "dma.h"
+#include "usart.h"
+#include "protocol.h" // 引入協定模組
+
+#define RX_BUF_SIZE 1024
+
+/* --- global variable --- */
+uint8_t rx_buffer[RX_BUF_SIZE];
+uint16_t rd_ptr = 0; 
+
+// 假設這兩個 flag 在 usart.c 的中斷服務程式中定義
+extern volatile uint8_t rx_idle_event;
+extern volatile uint8_t uart_overrun_occurred;
+
+void System_Init(void) {
+    RCC->APB2ENR |= (1UL << 14); // USART1 Clock
+    RCC->AHBENR  |= (1UL << 0);  // DMA1 Clock
+
+    GPIO_Init_Output(GPIOC, 6);
+    GPIO_Init_AF(GPIOA, 9, 1);
+    GPIO_Init_AF(GPIOA, 10, 1);
+    GPIO_Init_AF(GPIOA, 12, 1);
+
+    DMA_Init(DMA1, 2, (uint32_t)&(USART1->RDR), (uint32_t)rx_buffer, RX_BUF_SIZE);
+    UART_Init(USART1, 69); // 115200 @ 8MHz
+
+    *NVIC_ISER = (1UL << 27);
+    SysTick_Init(8000);
+}
+
+int main(void) {
+    System_Init();
+    uint32_t last_blink = 0;
+    uint8_t led_current_state = 0;
+
+    UART_Send(USART1, "NVMe Emulator Interface Ready...\r\n");
+
+    while (1) {
+        // 1. 錯誤處理 (Overrun)
+        if (uart_overrun_occurred) {
+            uart_overrun_occurred = 0;
+            UART_SendChar(USART1, 0x15); // ASCII NAK
+            rd_ptr = DMA_Get_Write_Index(DMA1, 2, RX_BUF_SIZE);
+        }
+
+        // 2. 指令解析與指標追蹤
+        uint16_t wr_ptr = DMA_Get_Write_Index(DMA1, 2, RX_BUF_SIZE);
+
+        if (rx_idle_event || (rd_ptr != wr_ptr)) {
+            // 計算當前 Buffer 中有多少未讀資料
+            uint16_t available = (wr_ptr >= rd_ptr) ? (wr_ptr - rd_ptr) : (RX_BUF_SIZE - rd_ptr + wr_ptr);
+
+            // 如果資料夠一個封包長度
+            while (available >= PKT_SIZE) {
+                if (rx_buffer[rd_ptr] == CMD_START_BYTE) {
+                    // 執行解析 (呼叫 drivers/protocol.c 中的函式)
+                    Protocol_Parse(&rx_buffer[rd_ptr]);
+                    
+                    // rd_ptr 往前推一個封包長度
+                    for(int i=0; i<PKT_SIZE; i++) {
+                        rd_ptr = (rd_ptr + 1) % RX_BUF_SIZE;
+                    }
+                    available -= PKT_SIZE;
+                } else {
+                    // 若開頭不是 A5，跳過這格尋找下一個 A5
+                    rd_ptr = (rd_ptr + 1) % RX_BUF_SIZE;
+                    available--;
+                }
+            }
+            rx_idle_event = 0; // 處理完所有可讀封包後清除標誌
+        }
+
+        // 3. 背景閃爍任務
+        if ((get_tick() - last_blink) >= 500) {
+            LED_Toggle(GPIOC, 6, &led_current_state);
+            last_blink = get_tick();
+        }
+    }
+}
+```
+
+
+#### host_sender.py
+```
+import serial
+import struct
+
+# 請根據實際狀況修改路徑，如 /dev/ttyACM0
+DEV_PATH = '/dev/ttyACM0'
+BAUD = 115200
+
+def send_nvme_read_cmd(lba, length):
+    try:
+        with serial.Serial(DEV_PATH, BAUD, timeout=1) as ser:
+            # >BBHH: 大端序, Start(A5), Op(1), LBA(H,L), Len(H,L)
+            raw_pkt = struct.pack('>BBHH', 0xA5, 0x01, lba, length)
+            # 計算 Checksum (前 6 bytes 累加)
+            checksum = sum(raw_pkt) & 0xFF
+            # 完整 7 bytes
+            final_pkt = raw_pkt + struct.pack('B', checksum)
+            
+            ser.write(final_pkt)
+            print(f"[*] 指令已送出: {final_pkt.hex().upper()}")
+            print(f"[*] 目標 LBA: {lba}, 預計讀取長度: {length}")
+    except Exception as e:
+        print(f"[!] 錯誤: {e}")
+
+if __name__ == "__main__":
+    # 發送一個讀取 LBA 10 的指令
+    send_nvme_read_cmd(lba=10, length=256)
+```
