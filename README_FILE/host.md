@@ -136,7 +136,7 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
   - `b` (break)：在處理 NVMe 讀取指令的函式入口設下紅綠燈
   - `c` (continue)：讓 CPU 開始跑，直到撞到紅綠燈為止
   - 在晶片內部設好陷阱，等待 Python 發過來的封包是否能正確觸發這個邏輯
-# Linux
+### Linux
   ```
   python3 host/host_sender.py
   ```
