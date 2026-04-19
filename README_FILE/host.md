@@ -112,7 +112,13 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
   - 必須 **重新登入** 或是 **重新啟動 Linux** 才會生效
   - Linux 的權限清單(Token) 只會在登入時載入一次, 即便執行 `usermod`，舊視窗依然拿著 **沒權限的舊身分證**, 不重登，指令就不會生效
   - 當 dino 執行的 Python 腳本, 想去動 `/dev/ttyUSB0` 時，系統會檢查身分，發現在 `dialout` 名單內，就允許通過
-
+  - 指令拆解
+    - `sudo` ： 使用管理員權限執行
+    - `usermod` ： User Modify，修改使用者的設定
+    - `-a` ：Append，代表 **追加**
+    - `-G` ：Group，代表 **群組**
+    - `dialout` ：這是 Linux 系統中專門 **管理通訊設備 (UART, Modem)** 的群組
+    - `$USER` ：是一個環境變數，會自動帶入現在登入的帳號名稱 (例如 dino)
 
 
 
