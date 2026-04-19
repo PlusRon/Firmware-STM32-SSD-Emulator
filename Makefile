@@ -28,7 +28,7 @@ CFLAGS  = -mcpu=cortex-m0 -mthumb -Iinclude -g -O0 -Wall -ffunction-sections -fd
 # 5. 連結參數 (LDFLAGS) - 斷捨離
 # -nostdlib: 拒絕電腦標準庫，掌握啟動程式 (Startup) 主導權
 # --gc-sections: 垃圾回收，自動刪除沒被呼叫到的函式區塊 (配合 -ffunction-sections)
-LDFLAGS = -T $(LINKER_SCRIPT) -nostdlib -Wl,--gc-sections
+LDFLAGS = -T $(LINKER_SCRIPT) -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs # -nostdlib
 
 # 5. 宣告偽目標
 .PHONY: all clean flash erase

@@ -1,5 +1,17 @@
 #include "usart.h"
+#include <stdio.h>
 
+
+/* 消滅 nosys 警告的 Stubs */
+#include <sys/stat.h>
+
+int _close(int file) { return -1; }
+int _fstat(int file, struct stat *st) { st->st_mode = S_IFCHR; return 0; }
+int _isatty(int file) { return 1; }
+int _lseek(int file, int ptr, int dir) { return 0; }
+int _read(int file, char *ptr, int len) { return 0; }
+int _getpid(void) { return 1; }
+int _kill(int pid, int sig) { return -1; }
 
 
 // 必須在這裡「定義」變數實體，不能只有 .h 的 extern
@@ -72,5 +84,14 @@ void UART_SendChar(USART_TypeDef *USARTx, uint8_t c)
     while (!(USARTx->ISR & (1UL << 7)))
         ;
     /* 寫入資料到 TDR (Transmit Data Register) */
-    USART1->TDR = c;
+    USARTx->TDR = c;
+}
+
+/* 實作 _write 函式，這是 printf 的底層出口 */
+int _write(int file, char *ptr, int len) {
+    for (int i = 0; i < len; i++) {
+      // 呼叫你原本寫好的發送函式
+        UART_SendChar(USART1, (uint8_t)ptr[i]);
+    }
+    return len;
 }

@@ -3,6 +3,10 @@
 #include "systick.h"
 #include "dma.h"
 #include "usart.h"
+#include "protocol.h"
+
+
+#include <stdio.h>
 
 /* --- MACRO define --- */
 #define RX_BUF_SIZE 1024 // Increasing the buffer size to 1024, significantly reduces the probability of ORE
@@ -51,7 +55,11 @@ int main(void)
     uint32_t last_blink = 0;
     uint8_t led_current_state = 0;
 
-    UART_Send(USART1, "Industrial UART System Initialized (RTS/NACK Enabled)\r\n");
+    //printf("System Start! Initializing DMA...\n");
+
+    // UART_Send(USART1, "Industrial UART System Initialized (RTS/NACK Enabled)\r\n");
+    
+    UART_Send(USART1, "NVMe Emulator Interface Ready...\r\n");
 
     while (1)
     {
@@ -77,39 +85,33 @@ int main(void)
         uint16_t wr_ptr = DMA_Get_Write_Index(DMA1, 2, RX_BUF_SIZE);
 
         // The outer layer uses a double-judgment threshold, and the inner layer uses dynamic catch-up logic.
-        if (rx_idle_event || (rd_ptr != wr_ptr))
-        {
+	
+	if (rx_idle_event || (rd_ptr != wr_ptr)) {
+            // 計算當前 Buffer 中有多少未讀資料
+            uint16_t available = (wr_ptr >= rd_ptr) ? (wr_ptr - rd_ptr) : (RX_BUF_SIZE - rd_ptr + wr_ptr);
 
-            // Only when there is actual data (pointer are not equal) will the buffer be read.
-            if (rd_ptr != wr_ptr)
-            {
-                // [ hint : can put a header tag here, for example, UART_Send("Recv: ");]
+            // 如果資料夠一個封包長度
+            while (available >= PKT_SIZE) {
+                if (rx_buffer[rd_ptr] == CMD_START_BYTE) {
+                    // 執行解析 (呼叫 drivers/protocol.c 中的函式)
+                    Protocol_Parse(&rx_buffer[rd_ptr]);
 
-                while (rd_ptr != wr_ptr)
-                {
-                    uint8_t data = rx_buffer[rd_ptr];
-
-                    // Process data (Echo or store into the protocol parser)
-                    // while (!(USART1->ISR & (1UL << 7)))
-                    //     ;
-                    // USART1->TDR = data;
-                    UART_SendChar(USART1, data);
-
-                    rd_ptr++;
-                    if (rd_ptr >= RX_BUF_SIZE)
-                        rd_ptr = 0;
-
-                    // 內圈動態追蹤最新的 wr_ptr
-                    // Dynamically captures the latest written pointer within the loop, ensuring a single clear.
-                    wr_ptr = DMA_Get_Write_Index(DMA1, 2, RX_BUF_SIZE);
+                    // rd_ptr 往前推一個封包長度
+                    for(int i=0; i<PKT_SIZE; i++) {
+                        rd_ptr = (rd_ptr + 1) % RX_BUF_SIZE;
+                    }
+                    available -= PKT_SIZE;
+                } else {
+                    // 若開頭不是 A5，跳過這格尋找下一個 A5
+                    rd_ptr = (rd_ptr + 1) % RX_BUF_SIZE;
+                    available--;
                 }
-                UART_Send(USART1, "\r\n");
             }
-
-            // 無論是因為指標不相等還是因為 IDLE 事件進來的，處理完後都清空事件
-            // All events should be cleared after processing, whether the issue from unequal pointer or from an IDLE event
-            rx_idle_event = 0;
+            rx_idle_event = 0; // 處理完所有可讀封包後清除標誌
         }
+
+
+
 
         // --- Task 2: Background Task ---
         if ((get_tick() - last_blink) >= 500)

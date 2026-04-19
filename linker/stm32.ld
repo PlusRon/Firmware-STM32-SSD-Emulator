@@ -49,5 +49,10 @@ SECTIONS
         *(COMMON)             /* collect the global-variable of Tentative Definition */
         . = ALIGN(4);
         _ebss = .;
+	__bss_end__ = _ebss;  /* 有些庫會使用這個符號 printf */ 
+
+        /* --- 加入以下兩行 --- */ 
+        end = .;              /* 標準庫尋找的 Heap 起始點  printf */
+        _end = .;             /* 為了相容性，通常會同時定義 _end printf */
     } > RAM
 }
