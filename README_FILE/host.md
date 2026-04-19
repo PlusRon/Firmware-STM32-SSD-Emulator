@@ -143,3 +143,10 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
   - 執行主機端腳本, 模擬真實的 NVMe 主機(Host)
   - 會把 **`0xA5` (起始位元)、`0x01` (Read Opcode)、LBA** 等資料包裝成一個 **7-byte 封包** 送出去
 
+## 整體測試的邏輯流向（意義）
+- **Python 腳本** ：把人類看得懂的 `要讀 LBA 10` 打包成二進位封包
+- **USB-to-UART** ：封包透過電線傳給 STM32
+- **STM32 DMA** ：完全不驚動 CPU，靜悄悄地把資料存進 `rx_buffer`
+- **Main Loop** ：發現 `rd_ptr != wr_ptr`，STM32 開始掃描讀取 RING BUFFER
+- **Protocol Parser** ：看到 `0xA5`，檢查 **Checksum**
+- **觸發斷點** ：如果封包正確，CPU 會停在 `handle_nvme_read`
