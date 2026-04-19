@@ -139,6 +139,8 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
 ### Linux
   ```
   python3 host/host_sender.py
+  :
+  [!] 錯誤: [Errno 13] could not open port /dev/ttyUSB0: [Errno 13] Permission denied: '/dev/ttyUSB0' -> 未加入 dialout 群組
   ```
   - 執行主機端腳本, 模擬真實的 NVMe 主機(Host)
   - 會把 **`0xA5` (起始位元)、`0x01` (Read Opcode)、LBA** 等資料包裝成一個 **7-byte 封包** 送出去
