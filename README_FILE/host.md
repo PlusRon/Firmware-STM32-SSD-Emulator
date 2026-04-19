@@ -67,31 +67,51 @@ Required-by:
 ```
 
 ## 二、開發板權限設定 
-### 確認目前帳號
-確認目前這個終端機視窗是以哪個使用者身分在執行, 確保沒有誤用 `root`
-```
-whoami
-```
-### 確認帳號擁有控制哪些群組的權限
-```
-groups
-:
-dino adm cdrom sudo dip plugdev lpadmin lxd dialout
-```
-### 查看詳細身分資訊
-一次看完 **使用者 ID (uid)**、**主要群組 (gid)** 以及 **所有附加群組**
-```
-dino$ id
-:
-uid=1000(dino) gid=1000(dino) groups=1000(dino),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),100(users),114(lpadmin)
-```
-```
-root$ id
-:
-uid=0(root) gid=0(root) groups=0(root)
-```
+### 查看 使用者端 的 身份權限設定
+- #### 確認目前帳號
+  
+  ```
+  whoami
+  ```
+  - 確認目前這個終端機視窗是以哪個使用者身分在執行, 確保沒有誤用 `root`
+- #### 確認帳號擁有控制哪些群組的權限
+  ```
+  groups
+  :
+  dino adm cdrom sudo dip plugdev lpadmin lxd dialout
+  ```
+- #### 查看詳細身分資訊
+  
+  ```
+  dino$ id
+  :
+  uid=1000(dino) gid=1000(dino) groups=1000(dino),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),100(users),114(lpadmin)
+  ```
+  ```
+  root$ id
+  :
+  uid=0(root) gid=0(root) groups=0(root)
+  ```
+   - 一次看完 **使用者 ID (uid)**、**主要群組 (gid)** 以及 **所有附加群組**
 
-
+### 確認串口權限
+Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 **Permission Denied**
+- #### 查看串口設備檔案 `/dev/ttyUSB0` 的詳細屬性，被歸類為哪個群組
+  ```
+  ls -l /dev/ttyUSB0
+  :
+  crw-rw---- 1 root dialout ...
+  ```
+  - `/dev/ttyUSB0` 是 Linux 幫 STM32 建立的 **虛擬檔案 (字元設備檔)**
+  - 只要目前使用者帳號的 groups 中有 dialout，就能讀寫它
+- #### 將帳號加入串口群組中，就可不需要 sudo 也可操控串口裝置
+  ```
+  sudo usermod -a -G dialout $USER
+  ```
+  - Linux 預設不允許一般使用者亂動硬體，將使用者帳號加入 `dialout` 群組後，就擁有對 `/dev/ttyUSB0` 的讀寫權限
+  - 必須 **重新登入** 或是 **重新啟動 Linux** 才會生效
+  - Linux 的權限清單(Token) 只會在登入時載入一次, 即便執行 `usermod`，舊視窗依然拿著 **沒權限的舊身分證**, 不重登，指令就不會生效
+  - 當 dino 執行的 Python 腳本, 想去動 `/dev/ttyUSB0` 時，系統會檢查身分，發現在 `dialout` 名單內，就允許通過
 
 
 
