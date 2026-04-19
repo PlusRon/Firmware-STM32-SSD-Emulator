@@ -126,4 +126,20 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
     - `666` : 代表讓 **所有人** 都可以讀寫這個設備,為暫時性
     - 當把 STM32 拔掉重插，或者是電腦重開機，這個設定就會消失
 
+## 三、執行 Host Driver 與 GDB 驗證 (測試層)
+驗證 **通訊協定解析器 (Protocol Parser)** 是否真的能正確拆解來自電腦的指令
+### STM32
+  ```
+  b handle_nvme_read
+  continue
+  ```
+  - `b` (break)：在處理 NVMe 讀取指令的函式入口設下紅綠燈
+  - `c` (continue)：讓 CPU 開始跑，直到撞到紅綠燈為止
+  - 在晶片內部設好陷阱，等待 Python 發過來的封包是否能正確觸發這個邏輯
+# Linux
+  ```
+  python3 host/host_sender.py
+  ```
+  - 執行主機端腳本, 模擬真實的 NVMe 主機(Host)
+  - 會把 **`0xA5` (起始位元)、`0x01` (Read Opcode)、LBA** 等資料包裝成一個 **7-byte 封包** 送出去
 
