@@ -1,4 +1,5 @@
 # HOST
+## 一、環境建置
 ### 查看 python 版本
 ```
 python3 --version
@@ -19,6 +20,7 @@ pip --version
     sudo apt install python3-serial
     ```
   - **虛擬環境 (Virtual Environment, venv) 安裝**
+    
     ```
     # 1. 在 host 資料夾下建立一個虛擬空間 (.venv)
     python3 -m venv .venv
@@ -29,6 +31,7 @@ pip --version
     # 3. 這時候你就可以「直接」安裝，不用加任何危險參數！
     pip install -r requirements.txt
     ```
+    - pyserial 只會存在於 .venv 資料夾裡，完全不會碰到 Linux 系統
 ### 列出清單, 搜尋已安裝的套件
 ```
 pip list | grep pyserial
@@ -62,4 +65,34 @@ Location: /usr/lib/python3/dist-packages
 Requires: 
 Required-by: 
 ```
+
+## 二、開發板權限設定 
+### 確認目前帳號
+確認目前這個終端機視窗是以哪個使用者身分在執行, 確保沒有誤用 `root`
+```
+whoami
+```
+### 確認帳號擁有控制哪些群組的權限
+```
+groups
+:
+dino adm cdrom sudo dip plugdev lpadmin lxd dialout
+```
+### 查看詳細身分資訊
+一次看完 **使用者 ID (uid)**、**主要群組 (gid)** 以及 **所有附加群組**
+```
+dino$ id
+:
+uid=1000(dino) gid=1000(dino) groups=1000(dino),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),100(users),114(lpadmin)
+```
+```
+root$ id
+:
+uid=0(root) gid=0(root) groups=0(root)
+```
+
+
+
+
+
 
