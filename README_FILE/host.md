@@ -8,6 +8,27 @@ python3 --version
 sudo apt install python3-pip -y
 pip --version
 ```
+
+### 安裝 pyserial
+  - **Linux 系統的安全性與穩定性 安裝**
+    ```
+    # 針對個人使用者安裝（建議）
+    pip install pyserial --break-system-packages
+    
+    # 或者使用 apt 安裝系統層級的套件（某些 Linux 發行版推薦）
+    sudo apt install python3-serial
+    ```
+  - **虛擬環境 (Virtual Environment, venv) 安裝**
+    ```
+    # 1. 在 host 資料夾下建立一個虛擬空間 (.venv)
+    python3 -m venv .venv
+    
+    # 2. 啟動這個空間 (啟動後你的終端機前面會出現 (.venv) 字樣)
+    source .venv/bin/activate
+    
+    # 3. 這時候你就可以「直接」安裝，不用加任何危險參數！
+    pip install -r requirements.txt
+    ```
 ### 列出清單, 搜尋已安裝的套件
 ```
 pip list | grep pyserial
