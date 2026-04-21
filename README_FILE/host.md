@@ -1,4 +1,4 @@
-# HOST
+# HOST NVMe Protocol
 ## 一、環境建置
 ### 查看 python 版本
 ```
@@ -126,33 +126,7 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
     - `666` : 代表讓 **所有人** 都可以讀寫這個設備,為暫時性
     - 當把 STM32 拔掉重插，或者是電腦重開機，這個設定就會消失
 
-## 三、執行 Host Driver 與 GDB 驗證 (測試層)
-驗證 **通訊協定解析器 (Protocol Parser)** 是否真的能正確拆解來自電腦的指令
-### STM32
-  ```
-  b handle_nvme_read
-  continue
-  ```
-  - `b` (break)：在處理 NVMe 讀取指令的函式入口設下紅綠燈
-  - `c` (continue)：讓 CPU 開始跑，直到撞到紅綠燈為止
-  - 在晶片內部設好陷阱，等待 Python 發過來的封包是否能正確觸發這個邏輯
-### Linux
-  ```
-  python3 host/host_sender.py
-  :
-  [!] 錯誤: [Errno 13] could not open port /dev/ttyUSB0: [Errno 13] Permission denied: '/dev/ttyUSB0' -> 未加入 dialout 群組
-  ```
-  - 執行主機端腳本, 模擬真實的 NVMe 主機(Host)
-  - 會把 **`0xA5` (起始位元)、`0x01` (Read Opcode)、LBA** 等資料包裝成一個 **7-byte 封包** 送出去
-
-## 整體測試的邏輯流向（意義）
-- **Python 腳本** ：把人類看得懂的 `要讀 LBA 10` 打包成二進位封包
-- **USB-to-UART** ：封包透過電線傳給 STM32
-- **STM32 DMA** ：完全不驚動 CPU，靜悄悄地把資料存進 `rx_buffer`
-- **Main Loop** ：發現 `rd_ptr != wr_ptr`，STM32 開始掃描讀取 RING BUFFER
-- **Protocol Parser** ：看到 `0xA5`，檢查 **Checksum**
-- **觸發斷點** ：如果封包正確，CPU 會停在 `handle_nvme_read`
-
+## 三、程式碼
 
 #### protocol.h
 ```
@@ -354,3 +328,33 @@ if __name__ == "__main__":
     # 發送一個讀取 LBA 10 的指令
     send_nvme_read_cmd(lba=10, length=256)
 ```
+
+
+## 四、執行 Host Driver 與 GDB 驗證 (測試層)
+驗證 **通訊協定解析器 (Protocol Parser)** 是否真的能正確拆解來自電腦的指令
+### STM32
+  ```
+  b handle_nvme_read
+  continue
+  ```
+  - `b` (break)：在處理 NVMe 讀取指令的函式入口設下紅綠燈
+  - `c` (continue)：讓 CPU 開始跑，直到撞到紅綠燈為止
+  - 在晶片內部設好陷阱，等待 Python 發過來的封包是否能正確觸發這個邏輯
+### Linux
+  ```
+  python3 host/host_sender.py
+  :
+  [!] 錯誤: [Errno 13] could not open port /dev/ttyUSB0: [Errno 13] Permission denied: '/dev/ttyUSB0' -> 未加入 dialout 群組
+  ```
+  - 執行主機端腳本, 模擬真實的 NVMe 主機(Host)
+  - 會把 **`0xA5` (起始位元)、`0x01` (Read Opcode)、LBA** 等資料包裝成一個 **7-byte 封包** 送出去
+
+## 整體測試的邏輯流向（意義）
+- **Python 腳本** ：把人類看得懂的 `要讀 LBA 10` 打包成二進位封包
+- **USB-to-UART** ：封包透過電線傳給 STM32
+- **STM32 DMA** ：完全不驚動 CPU，靜悄悄地把資料存進 `rx_buffer`
+- **Main Loop** ：發現 `rd_ptr != wr_ptr`，STM32 開始掃描讀取 RING BUFFER
+- **Protocol Parser** ：看到 `0xA5`，檢查 **Checksum**
+- **觸發斷點** ：如果封包正確，CPU 會停在 `handle_nvme_read`
+
+
