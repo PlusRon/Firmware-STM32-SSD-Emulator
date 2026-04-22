@@ -1,44 +1,51 @@
 import serial
 import struct
+import time
 
-# 請根據實際狀況修改路徑
-DEV_PATH = '/dev/ttyUSB0'
-BAUD = 115200
+def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=False):
+    print(f"\n--- Running: {name} ---")
+    
+    # 打包封包
+    actual_op = 0x99 if force_bad_op else opcode
+    raw = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
+    
+    # 計算 Checksum
+    if force_bad_cs:
+        checksum = (sum(raw) + 1) & 0xFF # 故意加 1 破壞校驗
+    else:
+        checksum = sum(raw) & 0xFF
+        
+    pkt = raw + struct.pack('B', checksum)
+    ser.write(pkt)
+    
+    time.sleep(0.2)
+    if ser.in_waiting > 0:
+        res = ser.read_all().decode('ascii', errors='ignore').strip()
+        print(f"Result: {res}")
 
-def send_nvme_read_cmd(lba, length):
-    try:
-        # 增加 timeout 確保 ser.readline() 不會永遠卡死
-        with serial.Serial(DEV_PATH, BAUD, timeout=2) as ser:
-            # 1. 準備封包
-            # >BBHH: 大端序, Start(A5), Op(1), LBA(H,L), Len(H,L)
-            raw_pkt = struct.pack('>BBHH', 0xA5, 0x01, lba, length)
-            
-            # 2. 計算 Checksum (前 6 bytes 累加取低 8 位)
-            checksum = sum(raw_pkt) & 0xFF
-            final_pkt = raw_pkt + struct.pack('B', checksum)
-            
-            # 3. 清除接收緩衝區 (避免讀到舊的殘留資料)
-            ser.reset_input_buffer()
-            
-            # 4. 送出指令
-            ser.write(final_pkt)
-            print(f"[*] 指令已送出: {final_pkt.hex().upper()}")
-            print(f"[*] 目標 LBA: {lba}, 預計讀取長度: {length}")
+try:
+    ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+    time.sleep(1)
+    ser.reset_input_buffer()
 
-            # 5. --- 新增：接收 STM32 的回報 ---
-            print("[*] 等待 STM32 回應...")
-            # readline 會讀到 '\n' 為止
-            response = ser.readline().decode('ascii', errors='replace').strip()
-            
-            if response:
-                print(f"[+] 收到回應: {response}")
-            else:
-                print("[!] 警告：超時未收到回應，請檢查 STM32 是否有跑進 handle_nvme_read")
-                
-    except Exception as e:
-        print(f"[!] 錯誤: {e}")
+    # 1. 成功案例 (Write & Read)
+    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 100, 8)
+    test_nvme("SUCCESSFUL READ",  ser, 0x01, 100, 8)
 
-if __name__ == "__main__":
-    # 測試發送
-    send_read_lba = 10
-    send_nvme_read_cmd(lba=send_read_lba, length=256)
+    # 2. 錯誤案例：Checksum 錯誤
+    test_nvme("CHECKSUM ERROR TEST", ser, 0x02, 200, 8, force_bad_cs=True)
+
+    # 3. 錯誤案例：不支援的指令 (Invalid Opcode)
+    test_nvme("INVALID OPCODE TEST", ser, 0x99, 0, 0, force_bad_op=True)
+
+    # 4. 錯誤案例：模擬 ORE (一次噴大量垃圾數據塞爆 Buffer)
+    print("\n--- Running: ORE OVERFLOW TEST ---")
+    ser.write(b'X' * 2000) # 噴 2000 個字元，超過 rx_buffer 的 1024
+    time.sleep(0.5)
+    if ser.in_waiting > 0:
+        res = ser.read_all().decode('ascii', errors='ignore')
+        print(f"Result: {res}")
+
+    ser.close()
+except Exception as e:
+    print(f"Error: {e}")
