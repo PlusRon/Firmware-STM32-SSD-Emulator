@@ -336,7 +336,25 @@ int main(void) {
   - 展示了 **生產者-消費者模型 (Producer-Consumer Model)**
   - DMA 是生產者，負責搬資料；while(1) 是消費者，負責解析資料
   - 這種設計讓 UART 接收不需要頻繁進出中斷服務程式（ISR），極大地降低了 CPU 負荷，這也是處理 NVMe 高速指令流的必備技術
-
+- **`USART1->ICR |= 0xFFFFFFFF;`** 的功用
+  - 硬體設計中常見的 **"Write 1 to Clear" (W1C)** 機制
+  - ICR (Interrupt Flag Clear Register) 裡面包含了很多旗標（如 ORE、IDLE、TC、TXE 等）
+  - 硬體暫存器（Register）中，狀態位元（如錯誤旗標）是由硬體電路自動設為 1 的，確保軟體在清除這些旗標時，不會因為「**讀取-修改-寫入（Read-Modify-Write）**」的過程誤改到其他位元，因此設計成 **寫入 0 無效，寫入 1 則觸發重置電路將該位元歸零**
+- ***NVIC_ISER = (1UL << 27);**
+  - NVIC (Nested Vectored Interrupt Controller)：這是 ARM Cortex-M 核心內部的**中斷控制器**
+  - ISER (Interrupt Set-Enable Register)：這是用來「致能」特定中斷的暫存器
+  - STM32F072 的資料手冊（Datasheet），USART1 的全局中斷在向量表中的編號（IRQ Number）正是 27
+  - 分層授權：即便你在 USART1->CR1 裡面開啟了 IDLE 中斷，如果 NVIC 沒把 27 號通道打開，CPU 永遠不會理會這個中斷請求。
+  - 硬體過濾：這讓開發者可以**精確控制哪些硬體可以打斷 CPU 的執行**，一旦 UART 滿足中斷條件，硬體會強行保存當前 CPU 暫存器狀態，並跳轉至我們定義的 USART1_IRQHandler 函式執行
+- CNDTR 的計算與 available 的邏輯差異
+  - **DMA_Get_Write_Index 的邏輯**
+    - CNDTR (Current Number of Data to Transfer) 在 DMA 模式下是一個 **倒數計數器(剩餘空間)**
+    - `目前寫入位置 (wr_ptr) = 總大小 - 剩餘計數`
+  - **為什麼 available 不能直接用 CNDTR**
+    - wr_ptr (DMA 提供)：告訴你「最新的一筆資料剛被放在哪裡」。
+    - rd_ptr (軟體提供)：告訴你「你的程式上次處理到哪裡」。
+    - available (計算得出)：告訴你「還有多少尚未處理的資料」。
+- 雙指標環形緩衝區管理。硬體端透過監控 DMA 的 CNDTR 暫存器來自動更新 Write Pointer；軟體端則維護一個 Read Pointer。透過兩者的差值計算出 available 資料量，這能確保我在非阻塞的環境下，精確判斷何時緩衝區內已積累足夠的完整封包（7 Bytes）供協定層解析，同時避免重複處理已讀取的舊資料。
 #### `host_sender.py`：Host 端驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性
 ```
 import serial
