@@ -216,6 +216,9 @@ void Protocol_Parse(uint8_t *packet_buf) {
 }
 
 void handle_nvme_read(uint16_t lba, uint16_t len) {
+    // 將長度限制在「虛擬磁碟的大小」以內，防止非法存取
+    // uint16_t safe_len = (len > 512) ? 512 : len;
+
     UART_Send(USART1, "[ACK] READ_OK:");
     // 限制讀取長度，避免非法存取，並循環模擬磁碟空間
     for (int i = 0; i < (len > 16 ? 16 : len); i++) {
