@@ -128,7 +128,8 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
 
 ## 三、程式碼
 
-#### `protocol.h`：通訊協定的規格定義，定義了 Host (電腦) 與 Device (STM32) 溝通的語言格式
+#### `protocol.h`：通訊協定的規格定義
+定義了 Host (電腦) 與 Device (STM32) 溝通的語言格式
 ```
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
@@ -177,7 +178,8 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
     - `start_byte` 與 `opcode` 屬於 `uint8_t` (1 byte)，在記憶體中不存在順序問題
     - `lba` 與 `length` 為 `uint16_t` (2 bytes)，因為 Host 以 Big-Endian 送出，STM32 讀取 16-bit 暫存器時會產生高低位元倒置，因此必須調用 `__builtin_bswap16` 進行手動翻轉
 
-#### `protocol.c`：指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
+#### `protocol.c`
+指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
 ```
 #include "protocol.h"
 #include "usart.h"
@@ -267,7 +269,8 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
   - 確保在模擬環境下，即使 LBA 超出範圍，系統仍能安全運行，防止 **記憶體非法存取 (Out-of-bounds Access)**
 
 
-#### `main.c`：硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
+#### `main.c`
+硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
 ```
 #include "stm32f072xb.h"
 #include "gpio.h"
@@ -368,8 +371,9 @@ int main(void) {
   - 解析器會掃描 rx_buffer 尋找同步字頭 0xA5
   - 若首字節不符，系統會逐位元偏移讀取指標 (rd_ptr++) 重新搜尋，具備強大的數據流自校正能力
 
-#### `host_sender.py`：Host 端驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性
-Host Driver（主機驅動程式），會根據定義好的協定，將指令「打包」成二進位流，並透過串口送給 STM32 驗證
+#### `host_sender.py`：驗證與自動化測試
+本模組 Host Driver (主機驅動程式) 為驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性。負責將抽象的指令封裝為符合規格的二進位流 (Binary Stream)，並透過 Python 實作自動化測試與 **錯誤注入 (Error Injection)** 機制，並透過串口送給 STM32 驗證
+
 ```
 import serial  # 負責串口通訊 (pySerial 庫)
 import struct  # 負責將 Python 資料型別轉換為 C 語言結構體二進位格式 (最關鍵)
@@ -441,10 +445,33 @@ try:
 except Exception as e:
     print(f"Error: {e}")
 ```
-- 自動化測試 (Unit Testing)：你會撰寫測試工具來驗證你的韌體。
-- 負向測試 (Negative Testing)：你懂得「注入錯誤」來驗證系統的健壯性（Robustness），而不是只測會通的功能。
-- 封包分析能力：你理解 struct.pack、Big-Endian 這些在嵌入式開發中極為重要的底層概念。
-- 系統級思維：你模擬了 Host 端產生 Overrun Error 的場景，這是在開發 SSD 控制器時最常遇到的穩定性挑戰之一。
+- #### 跨平台封包封裝 (Data Serialization)
+  - 利用 Python 的 `struct` 庫解決高級語言與 C 語言結構體之間的數據轉換問題
+  - 使用 `struct.pack('>BBHH', ...)` 顯式指定 **Big-Endian (大端序)** 編碼
+  - 確保 Host 端產生的位元組流符合 NVMe 與網路傳輸協定的標準，模擬真實的異質系統通訊
+- #### 錯誤注入與負向測試 (Negative Testing)
+  - **校驗碼攻擊 (Checksum Injection)**
+    - 故意計算錯誤的 Checksum 並發送
+    - 驗證 Device 端是否能精確攔截受損封包，防止無效數據進入邏輯層
+  - **非法指令攻擊 (Opcode Fuzzing)**
+    - 發送未定義的操作碼（如 `0x99`）
+    - 驗證韌體的 **邊界檢查 (Boundary Check)** 能力，確保系統不會因未知指令而產生未定義行為 (Undefined Behavior) 或當機
+  - **硬體溢位壓力測試 (Overrun Stress Test)**
+    - 一次性爆發式傳送 2000 Bytes 的數據（遠超 Device 端 1024 Bytes 的接收緩衝區）
+    - 模擬 Host 端產生過載，驗證 Device 端處理 **ORE (Overrun Error)** 硬體旗標與**自我復原 (Self-Recovery)** 的魯棒性
+- #### 診斷與監控 (Diagnostics)
+  - **ASCII 解碼與錯誤容忍**：使用 `.decode('ascii', errors='ignore')` 讀取回傳值
+  - 即便 Device 端因為故障回傳了亂碼，測試腳本仍能保持運行而不崩潰，並記錄下 Device 端最後的遺言作為除錯依據
+- #### 測試案例清單 (Test Cases)
+  |測試類型|案例名稱|驗證重點|
+  |:---|:---|:---|
+  |**Smoke Test**|SUCCESSFUL WRITE/READ|驗證基本通訊與 LBA 寫入讀取的邏輯正確性|
+  |**Robustness**|CHECKSUM ERROR TEST|驗證數據校驗攔截機制，模擬信號干擾情境|
+  |**Semantic**|INVALID OPCODE TEST|驗證指令集解析的完備性與非法指令防禦|
+Hardware,ORE OVERFLOW TEST,驗證 DMA Ring Buffer 耗盡後的硬體旗標自癒與重置。
+- #### System-Level Thinking
+  - **自動化測試(Unit Testing)**：取代手動輸入，透過腳本實現一鍵式回歸測試，注入錯誤來驗證系統的健壯性（Robustness）
+  - **端到端**：從 **物理層 (UART/DMA)** 到 **協定層 (Protocol)**，最後到 **驅動層 (Python Test Script)**，完整掌握數據在系統中的生命週期
 
 
 ## 四、執行 Host Driver 與 GDB 驗證 (測試層)
