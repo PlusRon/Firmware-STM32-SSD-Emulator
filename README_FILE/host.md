@@ -158,6 +158,9 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
 
 #endif
 ```
+- 為何要用 ‵__attribute__((packed))`？
+  - 在 32 位元系統中，編譯器為了存取效率，通常會將 `uint8_t` 後面填充 **1 byte** 空間來對齊 **2 bytes** 的 `uint16_t`
+  - 但在 **通訊協定中，資料是緊密排列** 的。如果不加這個屬性，struct 的大小會變成 8 bytes 而非 7 bytes，導致解析位址完全錯亂
 
 #### protocol.c
 ```
