@@ -158,14 +158,14 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
 
 #endif
 ```
-- 為何要用 `__attribute__((packed))`？
+- **為何要用 `__attribute__((packed))`？**
   - 在 32 位元系統中，編譯器為了存取效率，通常會將 `uint8_t` 後面填充 **1 byte** 空間來對齊 **2 bytes** 的 `uint16_t`，但在 **通訊協定中，資料是緊密排列** 的。如果不加這個屬性，struct 的大小會變成 8 bytes 而非 7 bytes，導致解析位址完全錯亂
-- LBA vs. Length
+- **LBA vs. Length**
   |**欄位名稱**|**技術定義**|
   |:---|:---|
   |**LBA (Logical Block Address)**|指指令要從磁碟的 「哪一個位置」 開始執行|
   |**Length**|指從該位置開始，「連續操作多少個區塊」|
-- 大端序 (Big-Endian) vs. 小端序 (Little-Endian)
+- **大端序 (Big-Endian) vs. 小端序 (Little-Endian)**
   - 大端序 (Big-Endian)：資料的高位元組 (Most Significant Byte, MSB) 放在低位址。在通訊協定（如 NVMe, TCP/IP）中，這被稱為「網路位元組序」。
   - 小端序 (Little-Endian)：資料的低位元組 (LSB) 放在低位址。是 STM32 (ARM) 和 x86 電腦在記憶體裡存取的方式
   - 多數的通訊協定為了標準化，規定使用大端序（網路位元組序）傳輸，而處理器（STM32）是小端序架構，為了正確解析 Host 傳來的 LBA 和 Length 數值，必須在軟體層進行 Byte Swap 操作，否則高低位元組顛倒會導致定址與長度計算完全錯誤
@@ -236,9 +236,10 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
   - 設計 Checksum 驗證機制時，不僅單純回傳錯誤訊息，還將 STM32 計算出的預期校驗值回傳給 Host，才能快速定位 傳輸完整性 (Signal Integrity) 問題。Diagnostic (診斷型) 回應 能大幅縮短硬體除錯的時間
     - 預期值與 Host 端一致：校驗碼欄位受損
     - 預期值不符：指令數據 (Payload) 在傳輸路徑中產生了雜訊干擾，
-- `__builtin_bswap16` 的必要性
-  - x86 或 Python 在處理 struct.pack 時通常預設大端序（高位元組在前）
+- **`__builtin_bswap16` 的必要性**
+  - x86 或 Python 在處理 struct.pack 時通常預設大端序（高位元組在前低位址）
   - 而 ARM Cortex-M 是小端序，例如地址 100 十六進位是 0x0064，若不經轉換，STM32 會把它讀成 0x6400 (25600)
+- 
 #### `main.c`：硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
 ```
 #include "stm32f072xb.h"
