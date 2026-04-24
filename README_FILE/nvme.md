@@ -128,7 +128,7 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
 
 ## 三、程式碼
 
-#### `protocol.h`：通訊協定的規格定義
+### `protocol.h`：通訊協定的規格定義
 定義了 Host (電腦) 與 Device (STM32) 溝通的語言格式
 ```
 #ifndef PROTOCOL_H
@@ -178,8 +178,8 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
     - `start_byte` 與 `opcode` 屬於 `uint8_t` (1 byte)，在記憶體中不存在順序問題
     - `lba` 與 `length` 為 `uint16_t` (2 bytes)，因為 Host 以 Big-Endian 送出，STM32 讀取 16-bit 暫存器時會產生高低位元倒置，因此必須調用 `__builtin_bswap16` 進行手動翻轉
 
-#### `protocol.c`
-指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
+### `protocol.c`：負責模擬 SSD 控制器的 運算層 (Execution Layer)
+包含指令解析與執行、數據校驗及空間映射
 ```
 #include "protocol.h"
 #include "usart.h"
@@ -269,8 +269,8 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
   - 確保在模擬環境下，即使 LBA 超出範圍，系統仍能安全運行，防止 **記憶體非法存取 (Out-of-bounds Access)**
 
 
-#### `main.c`
-硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
+### `main.c`：負責管理底層硬體資源
+透過 DMA 環形緩衝區 (Circular Buffer) 技術，在高傳輸負載下確保數據處理的完整性與系統穩定性
 ```
 #include "stm32f072xb.h"
 #include "gpio.h"
@@ -371,8 +371,8 @@ int main(void) {
   - 解析器會掃描 rx_buffer 尋找同步字頭 0xA5
   - 若首字節不符，系統會逐位元偏移讀取指標 (rd_ptr++) 重新搜尋，具備強大的數據流自校正能力
 
-#### `host_sender.py`：驗證與自動化測試
-本模組 Host Driver (主機驅動程式) 為驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性。負責將抽象的指令封裝為符合規格的二進位流 (Binary Stream)，並透過 Python 實作自動化測試與 **錯誤注入 (Error Injection)** 機制，並透過串口送給 STM32 驗證
+### `host_sender.py`：驗證與自動化測試
+ Host Driver (主機驅動程式) 為驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性。負責將抽象的指令封裝為符合規格的二進位流 (Binary Stream)，並透過 Python 實作自動化測試與 **錯誤注入 (Error Injection)** 機制，並透過串口送給 STM32 驗證
 
 ```
 import serial  # 負責串口通訊 (pySerial 庫)
