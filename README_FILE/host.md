@@ -168,6 +168,8 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
 - 大端序 (Big-Endian) vs. 小端序 (Little-Endian)
   - 大端序 (Big-Endian)：資料的高位元組 (Most Significant Byte, MSB) 放在低位址。在通訊協定（如 NVMe, TCP/IP）中，這被稱為「網路位元組序」。
   - 小端序 (Little-Endian)：資料的低位元組 (LSB) 放在低位址。是 STM32 (ARM) 和 x86 電腦在記憶體裡存取的方式
+  - 多數的通訊協定為了標準化，規定使用大端序（網路位元組序）傳輸，而處理器（STM32）是小端序架構，為了正確解析 Host 傳來的 LBA 和 Length 數值，必須在軟體層進行 Byte Swap 操作，否則高低位元組顛倒會導致定址與長度計算完全錯誤
+  - Endianness 轉換只發生在 **Multi-byte Data Types（多位元組資料型別）** 上，NVMe 指令結構中，start_byte 和 opcode 屬於 uint8_t，它們在記憶體中只佔用單一地址，因此不存在 bytes 順序問題，而 lba 和 length 屬於 uint16_t，跨越了兩個字節。由於通訊協定規定以 Big-Endian 傳輸，而 STM32 硬體是以 Little-Endian 方式讀取 16-bit 暫存器，因此只有這兩個欄位需要進行 `__builtin_bswap16` 轉換，以確保數值的正確性。
 
 #### `protocol.c`：指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
 ```
