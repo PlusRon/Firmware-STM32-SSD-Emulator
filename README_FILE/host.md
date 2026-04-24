@@ -128,7 +128,7 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
 
 ## 三、程式碼
 
-#### protocol.h
+#### `protocol.h`：通訊協定的規格定義，定義了 Host (電腦) 與 Device (STM32) 溝通的語言格式
 ```
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
