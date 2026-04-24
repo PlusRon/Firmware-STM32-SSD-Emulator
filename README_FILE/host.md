@@ -305,7 +305,7 @@ int main(void) {
   - DMA 是生產者，負責搬資料；while(1) 是消費者，負責解析資料
   - 這種設計讓 UART 接收不需要頻繁進出中斷服務程式（ISR），極大地降低了 CPU 負荷，這也是處理 NVMe 高速指令流的必備技術
 
-#### host_sender.py
+#### `host_sender.py`：Host 端驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性
 ```
 import serial
 import struct
@@ -314,42 +314,45 @@ import time
 def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=False):
     print(f"\n--- Running: {name} ---")
     
-    # 打包封包
+    # 模擬錯誤 Opcode 測試
     actual_op = 0x99 if force_bad_op else opcode
+
+    # 使用 Big-Endian (>) 封裝資料：Header(B), Opcode(B), LBA(H), Len(H)
     raw = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
     
-    # 計算 Checksum
+    # # 模擬校驗錯誤測試，計算 Checksum
     if force_bad_cs:
-        checksum = (sum(raw) + 1) & 0xFF # 故意加 1 破壞校驗
+        checksum = (sum(raw) + 1) & 0xFF # 故意讓校驗碼錯誤
     else:
-        checksum = sum(raw) & 0xFF
+        checksum = sum(raw) & 0xFF       # 標準計算
         
-    pkt = raw + struct.pack('B', checksum)
-    ser.write(pkt)
+    pkt = raw + struct.pack('B', checksum)  # 組合最終 7-byte 封包
+    ser.write(pkt)                          # 透過實體串口送出
     
-    time.sleep(0.2)
+    time.sleep(0.2)  # 等待 Device 處理回應
     if ser.in_waiting > 0:
         res = ser.read_all().decode('ascii', errors='ignore').strip()
         print(f"Result: {res}")
 
 try:
+    # 初始化序列埠，115200, N, 8, 1
     ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-    time.sleep(1)
+    time.sleep(1)   # 等待硬體穩定
     ser.reset_input_buffer()
 
-    # 1. 成功案例 (Write & Read)
+    # 1. 冒煙測試：基本讀寫功能，成功案例 (Write & Read)
     test_nvme("SUCCESSFUL WRITE", ser, 0x02, 100, 8)
     test_nvme("SUCCESSFUL READ",  ser, 0x01, 100, 8)
 
-    # 2. 錯誤案例：Checksum 錯誤
+    # 2. 魯棒性測試：故意傳送 Checksum 錯誤的封包
     test_nvme("CHECKSUM ERROR TEST", ser, 0x02, 200, 8, force_bad_cs=True)
 
-    # 3. 錯誤案例：不支援的指令 (Invalid Opcode)
+    # 3. 語義測試：傳送未定義的指令、不支援的指令 (Invalid Opcode)
     test_nvme("INVALID OPCODE TEST", ser, 0x99, 0, 0, force_bad_op=True)
 
-    # 4. 錯誤案例：模擬 ORE (一次噴大量垃圾數據塞爆 Buffer)
+    # 4. 壓力與異常測試：模擬 Host 端產生過載 (Overrun)，模擬 ORE (一次噴大量垃圾數據塞爆 Buffer)
     print("\n--- Running: ORE OVERFLOW TEST ---")
-    ser.write(b'X' * 2000) # 噴 2000 個字元，超過 rx_buffer 的 1024
+    ser.write(b'X' * 2000) # 噴 2000 個字元，超過 rx_buffer 的 1024 緩衝區的數據量
     time.sleep(0.5)
     if ser.in_waiting > 0:
         res = ser.read_all().decode('ascii', errors='ignore')
