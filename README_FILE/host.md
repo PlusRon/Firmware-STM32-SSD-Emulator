@@ -191,8 +191,11 @@ void Protocol_Parse(uint8_t *packet_buf) {
 
     // 2. 驗證 Checksum：若計算結果與封包內的 checksum 不符，判定為雜訊或傳輸錯誤
     if (calculated_cs != cmd->checksum) {
-        UART_Send(USART1, "[ERR] CS_FAIL (Expected: 0x");
-        UART_SendChar(USART1, calculated_cs); // 回傳正確的 CS 給 Host 供調試
+        UART_Send(USART1, "[ERR] Checksum Mismatch!\r\n");
+        UART_Send(USART1, "  Received: 0x");
+        UART_SendChar(USART1, cmd->checksum); // 顯示封包帶來的 CS
+        UART_Send(USART1, "\r\n  Expected: 0x");
+        UART_SendChar(USART1, calculated_cs); // 顯示 STM32 算出的 CS
         UART_Send(USART1, ")\r\n");
         return;　// 放棄該封包，不執行指令
     }
