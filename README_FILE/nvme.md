@@ -241,26 +241,32 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }
 ```
-- **CheckSum**
-  - 設計 Checksum 驗證機制時，不僅單純回傳錯誤訊息，還將 STM32 計算出的預期校驗值回傳給 Host，才能快速定位 傳輸完整性 (Signal Integrity) 問題。Diagnostic (診斷型) 回應 能大幅縮短硬體除錯的時間
-    - 預期值與 Host 端一致：校驗碼欄位受損
-    - 預期值不符：指令數據 (Payload) 在傳輸路徑中產生了雜訊干擾，
-- **`__builtin_bswap16` 的必要性**
-  - x86 或 Python 在處理 struct.pack 時通常預設大端序（高位元組在前低位址）
-  - 而 ARM Cortex-M 是小端序，例如地址 100 十六進位是 0x0064，若不經轉換，STM32 會把它讀成 0x6400 (25600)
-- **RX_BUF_SIZE (1024) 比 virtual_disk (512) 大**
-  - UART 是一個持續流入的資料流。當你的 CPU 正在處理 Protocol_Parse（例如正在算 Checksum 或印 Debug 訊息）時，DMA 仍會不停地把新資料塞進來
-  - 如果 Ring Buffer 太小（例如也只有 512 或更小），一旦 CPU 稍微忙不過來，新進來的封包就會立刻覆蓋掉還沒處理的封包，導致 **ORE (Overrun Error)**
-  - virtual_disk (512) 是為了模擬虛擬 SSD 只有 512 Byte 的容量
-  - STM32F072 的 SRAM 有限（僅 16KB）。在實驗階段，不需要開一個幾千 Byte 的陣列。512 Byte 剛好對應一個標準的**磁碟磁區（Sector）大小**，非常具有代表性
-- **限制只能讀取 16 個長度的 LBA**
-  - length 欄位有 2 Bytes，理論上可以要求讀取 65535 Bytes，但在韌體開發中，我們嚴禁完全信任 Host 端傳來的數值
-  - 如果 Host 惡意或不小心傳了一個 length = 60000
-    - 以 115200 波特率傳送 60000 Bytes 需要約 5.2 秒。在這 5.2 秒內，STM32 的 CPU 會卡在 for 迴圈裡不斷送資料，完全無法處理新的指令。
-    - 在真實系統中，這可能導致其他高優先權的任務（如馬達控制、溫度監控）被餓死（Starvation）。
-  - virtual_disk 只有 512 塊。如果讀取長度超過 512，資料就會開始重複
-  - 限制在 16，是為了讓你在 Minicom 或 Python 終端機 上能清楚看到一整行易讀的輸出。如果你一次噴 1000 個字元，畫面會亂掉，難以觀察 `defghijk...` 這種驗證字串
-- 協定支援 64KB 的傳輸，但在韌體實作中，加入了 **Payload Sanity Check（合法性檢查）**。將單次讀取限制在 16 Bytes，是為了**防止 Host 端的非法大長度請求佔用系統總線（Bus）** 過長時間，確保系統具備基本的 **Quality of Service (QoS) 與自保能力**。
+- #### 數據校驗機制 (Checksum Verification)
+  - 確保指令在傳輸路徑中的完整性 (Signal Integrity)，實作 8-bit 累加校驗
+  - **診斷型回應 (Diagnostic Response)**：當 Checksum 失敗時，系統不僅回傳錯誤代碼，也回傳 STM32 計算出的預期值 (Expected) 與 實際接收值 (Received)
+    |預期值與 Host 一致|預期值與 Host 不符|
+    |:---:|:---:|
+    |代表數據段正確，僅校驗碼位元受損|代表指令數據 (Payload) 遭受雜訊干擾，導致 Bit Flip|
+- #### 位元組序翻轉 (Endianness Conversion)
+  - 通訊協定（如 Python `struct.pack`）預設使用 大端序 (Big-Endian) 傳輸，而 ARM Cortex-M (STM32) 為 小端序 (Little-Endian) 架構，系統必須進行顯式轉換
+  - 使用 **編譯器內建** 指令 `__builtin_bswap16` 進行硬體級翻轉，避免位址解析錯誤（例如將 LBA 100 解析為 25600），確保地址映射的精確性
+- #### 多層級緩衝區架構 (Buffer Management)
+  |RX_BUF_SIZE (1024 Bytes)|Virtual Disk (512 Bytes)|
+  |:---|:---|
+  |通訊層緩衝區|模擬 SSD 儲存空間|
+  |提供充足的**流量控制 (Flow Control)** 空間。當 CPU 正在處理校驗或中斷時，DMA 仍可持續搬運資料。較大的 Buffer 可有效**避免 Overrun Error (ORE)** 導致的封包遺失|對應標準 **磁碟磁區 (Sector Size)**，在有限的 SRAM (16KB) 中實現具備代表性的儲存模擬|
+
+- #### 指令合法性檢查 (Payload Sanity Check)
+  - 協定理論支援 64KB 傳輸，但在韌體實作中採取 **防禦性編程 (Defensive Programming)**，不信任任何外部輸入
+  - 讀取長度限制 (Quality of Service, QoS 策略)：將單次讀取強制限制為 16 Bytes
+  - **防止總線霸佔 (Bus Hogging)**：避免長達數秒(讀取長資料)的 UART 傳輸導致系統任務 **飢餓 (Starvation)**，確保馬達控制或溫度監控等高優先權任務的即時性
+  - **系統自保 (Self-Protection)**：防止 Host 端因惡意或錯誤的大長度請求，導致系統卡死
+  - **可觀測性 (Observability)**：確保 Debug 終端機能輸出整齊、易讀的驗證字串，提升除錯效率
+- #### 循環定址模擬
+  - 透過 `(lba + i) % 512` 實作循環邊界處理
+  - 確保在模擬環境下，即使 LBA 超出範圍，系統仍能安全運行，防止 **記憶體非法存取 (Out-of-bounds Access)**
+
+
 #### `main.c`：硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
 ```
 #include "stm32f072xb.h"
