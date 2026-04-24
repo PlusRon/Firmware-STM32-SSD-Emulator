@@ -162,45 +162,50 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
   - 在 32 位元系統中，編譯器為了存取效率，通常會將 `uint8_t` 後面填充 **1 byte** 空間來對齊 **2 bytes** 的 `uint16_t`
   - 但在 **通訊協定中，資料是緊密排列** 的。如果不加這個屬性，struct 的大小會變成 8 bytes 而非 7 bytes，導致解析位址完全錯亂
 
-#### protocol.c
+#### ｀protocol.c｀：指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
 ```
 #include "protocol.h"
 #include "usart.h"
 
+// 模擬快閃記憶體 (NAND Flash) 的儲存空間，大小為 512 Bytes
 static uint8_t virtual_disk[512];
 
 void Protocol_Parse(uint8_t *packet_buf) {
+    // 將輸入緩衝區強制轉換為結構體指針，方便直接透過名稱存取欄位
     NVMe_Command_t *cmd = (NVMe_Command_t *)packet_buf;
     uint8_t calculated_cs = 0;
 
-    // 1. 計算 Checksum
+    // 1. 計算 Checksum：將封包前 6 個 byte 累加
     for (int i = 0; i < 6; i++) {
         calculated_cs += packet_buf[i];
     }
 
-    // 2. 驗證 Checksum
+    // 2. 驗證 Checksum：若計算結果與封包內的 checksum 不符，判定為雜訊或傳輸錯誤
     if (calculated_cs != cmd->checksum) {
         UART_Send(USART1, "[ERR] CS_FAIL (Expected: 0x");
-        UART_SendChar(USART1, calculated_cs); // 這裡輸出原始值作為調試
+        UART_SendChar(USART1, calculated_cs); // 回傳正確的 CS 給 Host 供調試
         UART_Send(USART1, ")\r\n");
-        return;
+        return;　// 放棄該封包，不執行指令
     }
 
-    // 3. 驗證 Opcode
+    // 3. 處理位元組序 (Endianness)：使用內建指令將大端序(Host)轉為小端序(STM32)
     uint16_t lba = (uint16_t)__builtin_bswap16(cmd->lba);
     uint16_t len = (uint16_t)__builtin_bswap16(cmd->length);
 
+    // 4. 指令派發 (Command Dispatching)
     if (cmd->opcode == NVME_OP_READ) {
         handle_nvme_read(lba, len);
     } else if (cmd->opcode == NVME_OP_WRITE) {
         handle_nvme_write(lba, len);
     } else {
+        // 若 Opcode 不在定義內，回傳無效指令錯誤
         UART_Send(USART1, "[ERR] INVALID_OP\r\n");
     }
 }
 
 void handle_nvme_read(uint16_t lba, uint16_t len) {
     UART_Send(USART1, "[ACK] READ_OK:");
+    // 限制讀取長度，避免非法存取，並循環模擬磁碟空間
     for (int i = 0; i < (len > 16 ? 16 : len); i++) {
         UART_SendChar(USART1, virtual_disk[(lba + i) % 512]);
     }
@@ -208,13 +213,17 @@ void handle_nvme_read(uint16_t lba, uint16_t len) {
 }
 
 void handle_nvme_write(uint16_t lba, uint16_t len) {
+    // 模擬寫入邏輯：將 LBA 地址轉換為資料存入，用於後續讀取驗證
     for (int i = 0; i < (len > 16 ? 16 : len); i++) {
         virtual_disk[(lba + i) % 512] = (uint8_t)(lba + i);
     }
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }
 ```
-#### main.c
+- `__builtin_bswap16` 的必要性
+  - x86 或 Python 在處理 struct.pack 時通常預設大端序（高位元組在前）
+  - 而 ARM Cortex-M 是小端序，例如地址 100 十六進位是 0x0064，若不經轉換，STM32 會把它讀成 0x6400 (25600)
+#### `main.c`：硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
 ```
 #include "stm32f072xb.h"
 #include "gpio.h"
@@ -224,21 +233,25 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
 #include "protocol.h"
 
 #define RX_BUF_SIZE 1024
-uint8_t rx_buffer[RX_BUF_SIZE];
-uint16_t rd_ptr = 0;
+uint8_t rx_buffer[RX_BUF_SIZE];  // 定義 1KB 的接收緩衝區
+uint16_t rd_ptr = 0;             // 軟體讀取指標 (Software Read Pointer)
 
 int main(void) {
-    // 系統初始化 (維持原有邏輯)
-    RCC->APB2ENR |= (1UL << 14); 
-    RCC->AHBENR  |= (1UL << 0);  
-    GPIO_Init_Output(GPIOC, 6);
-    GPIO_Init_AF(GPIOA, 9, 1);
-    GPIO_Init_AF(GPIOA, 10, 1);
+    /* 硬體底層初始化節點 */
+    RCC->APB2ENR |= (1UL << 14);   // 開啟 USART1 時鐘
+    RCC->AHBENR  |= (1UL << 0);    // 開啟 DMA1 時鐘
+    GPIO_Init_Output(GPIOC, 6);    // 初始化 LED
+    GPIO_Init_AF(GPIOA, 9, 1);     // UART1 TX 腳位設定
+    GPIO_Init_AF(GPIOA, 10, 1);    // UART1 RX 腳位設定
+
+    // 清除 USART1 所有狀態旗標，防止啟動時的垃圾雜訊導致錯誤
     USART1->ICR |= 0xFFFFFFFF;
+
+    // 初始化 DMA：將 UART->RDR 直接映射到 rx_buffer，循環搬運
     DMA_Init(DMA1, 2, (uint32_t)&(USART1->RDR), (uint32_t)rx_buffer, RX_BUF_SIZE);
-    UART_Init(USART1, 69); 
-    *NVIC_ISER = (1UL << 27);
-    SysTick_Init(8000);
+    UART_Init(USART1, 69);     // 設定波特率 115200
+    *NVIC_ISER = (1UL << 27);  // 開啟中斷向量表中的 UART1 中斷
+    SysTick_Init(8000);        // 1ms 系統滴答
 
     uint32_t last_blink = 0;
     uint8_t led_state = 0;
@@ -246,33 +259,40 @@ int main(void) {
     UART_Send(USART1, "\r\n--- Diagnostics Mode Active ---\r\n");
 
     while (1) {
-        // --- 錯誤處理：硬體溢位 ---
+        // --- 錯誤處理：硬體溢位 (ORE) ---
+        // 當 CPU 處理太慢導致 UART 接收器被塞爆時，觸發此邏輯
         if (uart_overrun_occurred) {
             uart_overrun_occurred = 0;
             UART_Send(USART1, "[SYS] ORE_ERROR (Hardware Buffer Full)\r\n");
-            // 重置傳輸鏈
+            // 重置 DMA 傳輸鏈，清空緩衝區重新同步
             DMA_Init(DMA1, 2, (uint32_t)&(USART1->RDR), (uint32_t)rx_buffer, RX_BUF_SIZE);
             rd_ptr = 0;
         }
 
+        // 獲取目前的 DMA 寫入位置 (Hardware Write Pointer)
         uint16_t wr_ptr = DMA_Get_Write_Index(DMA1, 2, RX_BUF_SIZE);
 
+        // 如果讀取與寫入指標不相等，代表有新資料進入
         if (rd_ptr != wr_ptr) {
+            // 計算目前緩衝區內有多少剩餘資料
             uint16_t available = (wr_ptr >= rd_ptr) ? (wr_ptr - rd_ptr) : (RX_BUF_SIZE - rd_ptr + wr_ptr);
 
+            // 只有當資料量大於等於一個完整封包 (7 bytes) 才開始解析
             while (available >= PKT_SIZE) {
+                // 同步機制：確認第一個 Byte 必須是 0xA5
                 if (rx_buffer[rd_ptr] == CMD_START_BYTE) {
-                    Protocol_Parse(&rx_buffer[rd_ptr]);
-                    rd_ptr = (rd_ptr + PKT_SIZE) % RX_BUF_SIZE;
+                    Protocol_Parse(&rx_buffer[rd_ptr]);         // 進入協定解析
+                    rd_ptr = (rd_ptr + PKT_SIZE) % RX_BUF_SIZE; // 指標後移
                     available -= PKT_SIZE;
                 } else {
-                    // 如果發現標頭不是 0xA5，視為無效數據並跳過
+                    // 如果不是 0xA5，視為無效數據並跳過，代表資料流位移，逐位元尋找標頭
                     rd_ptr = (rd_ptr + 1) % RX_BUF_SIZE;
                     available--;
                 }
             }
         }
 
+        // 背景心跳燈：確認系統沒有死機 (Non-blocking Blink)
         if ((get_tick() - last_blink) >= 500) {
             LED_Toggle(GPIOC, 6, &led_state);
             last_blink = get_tick();
@@ -280,7 +300,10 @@ int main(void) {
     }
 }
 ```
-
+- DMA Ring Buffer 的優勢
+  - 展示了 **生產者-消費者模型 (Producer-Consumer Model)**
+  - DMA 是生產者，負責搬資料；while(1) 是消費者，負責解析資料
+  - 這種設計讓 UART 接收不需要頻繁進出中斷服務程式（ISR），極大地降低了 CPU 負荷，這也是處理 NVMe 高速指令流的必備技術
 
 #### host_sender.py
 ```
