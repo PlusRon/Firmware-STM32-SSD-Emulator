@@ -344,29 +344,30 @@ int main(void) {
     }
 }
 ```
-- DMA Ring Buffer 的優勢
-  - 展示了 **生產者-消費者模型 (Producer-Consumer Model)**
-  - DMA 是生產者，負責搬資料；while(1) 是消費者，負責解析資料
-  - 這種設計讓 UART 接收不需要頻繁進出中斷服務程式（ISR），極大地降低了 CPU 負荷，這也是處理 NVMe 高速指令流的必備技術
-- **`USART1->ICR |= 0xFFFFFFFF;`** 的功用
-  - 硬體設計中常見的 **"Write 1 to Clear" (W1C)** 機制
-  - ICR (Interrupt Flag Clear Register) 裡面包含了很多旗標（如 ORE、IDLE、TC、TXE 等）
-  - 硬體暫存器（Register）中，狀態位元（如錯誤旗標）是由硬體電路自動設為 1 的，確保軟體在清除這些旗標時，不會因為「**讀取-修改-寫入（Read-Modify-Write）**」的過程誤改到其他位元，因此設計成 **寫入 0 無效，寫入 1 則觸發重置電路將該位元歸零**
-- ***NVIC_ISER = (1UL << 27);**
-  - NVIC (Nested Vectored Interrupt Controller)：這是 ARM Cortex-M 核心內部的**中斷控制器**
-  - ISER (Interrupt Set-Enable Register)：這是用來「致能」特定中斷的暫存器
-  - STM32F072 的資料手冊（Datasheet），USART1 的全局中斷在向量表中的編號（IRQ Number）正是 27
-  - 分層授權：即便你在 USART1->CR1 裡面開啟了 IDLE 中斷，如果 NVIC 沒把 27 號通道打開，CPU 永遠不會理會這個中斷請求。
-  - 硬體過濾：這讓開發者可以**精確控制哪些硬體可以打斷 CPU 的執行**，一旦 UART 滿足中斷條件，硬體會強行保存當前 CPU 暫存器狀態，並跳轉至我們定義的 USART1_IRQHandler 函式執行
-- CNDTR 的計算與 available 的邏輯差異
-  - **DMA_Get_Write_Index 的邏輯**
-    - CNDTR (Current Number of Data to Transfer) 在 DMA 模式下是一個 **倒數計數器(剩餘空間)**
-    - `目前寫入位置 (wr_ptr) = 總大小 - 剩餘計數`
-  - **為什麼 available 不能直接用 CNDTR**
-    - wr_ptr (DMA 提供)：告訴你「最新的一筆資料剛被放在哪裡」。
-    - rd_ptr (軟體提供)：告訴你「你的程式上次處理到哪裡」。
-    - available (計算得出)：告訴你「還有多少尚未處理的資料」。
-- 雙指標環形緩衝區管理。硬體端透過監控 DMA 的 CNDTR 暫存器來自動更新 Write Pointer；軟體端則維護一個 Read Pointer。透過兩者的差值計算出 available 資料量，這能確保我在非阻塞的環境下，精確判斷何時緩衝區內已積累足夠的完整封包（7 Bytes）供協定層解析，同時避免重複處理已讀取的舊資料。
+- #### 生產者-消費者模型 (Producer-Consumer Model)
+  - **生產者 (Producer)**：由 DMA1 Channel 2 擔任，負責將 UART 接收到的原始數據自動搬運至 rx_buffer，無需 CPU 介入
+  - **消費者 (Consumer)**：於 `while(1)` 主迴圈執行，負責根據協定邏輯解析緩衝區中的數據
+  - 避免了頻繁進出中斷服務程式 (ISR) 導致的**上下文切換 (Context Switch)** 開銷，是處理 NVMe 高速指令流的工業級標準做法
+- #### 雙指標環形緩衝區管理 (Dual-Pointer Management)
+  - 在 **非阻塞 (Non-blocking)** 環境下精確管理數據，系統維護了兩個關鍵指標
+  - **硬體寫入指標 (wr_ptr)**：透過監控 DMA 的 CNDTR 暫存器即時計算獲得
+    - `wr_ptr = Total_Size - CNDTR` (由於 CNDTR 是倒數計數器, 紀錄剩餘空間)
+  - **軟體讀取指標 (rd_ptr)**：由軟體維護，標記**目前處理到的位置**
+  - **可用數據量 (available)**：
+    - `(wr_ptr >= rd_ptr) ? (wr_ptr - rd_ptr) : (RX_BUF_SIZE - rd_ptr + wr_ptr)
+    - CNDTR 僅反映硬體填充進度，唯有結合 `rd_ptr` 才能得知**真正尚未處理的數據量**，確保指令不遺漏、不重複(避免重複處理已讀取的舊資料)、精確判斷何時緩衝區內已積累足夠的完整封包(7 Bytes)
+- #### 硬體層級的安全保障機制
+  - **W1C (Write 1 to Clear) 機制**： `USART1->ICR |= 0xFFFFFFFF;`，硬體旗標（如溢位錯誤 ORE）由電路自動置位。採用 **寫 1 清除** 邏輯可**避免 讀取-修改-寫入** 過程中產生的 **競態條件 (Race Condition)**，確保狀態清除的原子性
+  - **NVIC 分層授權管理**：`*NVIC_ISER = (1UL << 27);` (開啟 **IRQ 27：USART1**)，即便外設配置正確，若無 NVIC 的全域授權，CPU 仍不會響應中斷。這提供了精確的硬體過濾功能，讓開發者能嚴格控制 CPU 的執行時機
+- #### ORE (Overrun Error) 偵測與自癒
+  - 當系統處理速度無法跟上資料流入速度時，硬體會觸發 ORE 旗標
+  - 系統主動偵測此異常，並執行診斷回應（發送 `[SYS] ORE_ERROR`），隨後立即重置 DMA 鏈路
+  - 防止傳輸鏈路永久卡死，確保系統在遭遇極端高壓後能自動恢復正常運作
+- #### 指令同步機制 (Command Synchronization)
+  - UART 為流式傳輸，封包邊界可能位移
+  - 解析器會掃描 rx_buffer 尋找同步字頭 0xA5
+  - 若首字節不符，系統會逐位元偏移讀取指標 (rd_ptr++) 重新搜尋，具備強大的數據流自校正能力
+
 #### `host_sender.py`：Host 端驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性
 Host Driver（主機驅動程式），會根據定義好的協定，將指令「打包」成二進位流，並透過串口送給 STM32 驗證
 ```
