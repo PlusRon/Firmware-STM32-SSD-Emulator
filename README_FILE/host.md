@@ -232,6 +232,10 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }
 ```
+- **CheckSum**
+  - 設計 Checksum 驗證機制時，不僅單純回傳錯誤訊息，還將 STM32 計算出的預期校驗值回傳給 Host，才能快速定位 傳輸完整性 (Signal Integrity) 問題。Diagnostic (診斷型) 回應 能大幅縮短硬體除錯的時間
+    - 預期值與 Host 端一致：校驗碼欄位受損
+    - 預期值不符：指令數據 (Payload) 在傳輸路徑中產生了雜訊干擾，
 - `__builtin_bswap16` 的必要性
   - x86 或 Python 在處理 struct.pack 時通常預設大端序（高位元組在前）
   - 而 ARM Cortex-M 是小端序，例如地址 100 十六進位是 0x0064，若不經轉換，STM32 會把它讀成 0x6400 (25600)
