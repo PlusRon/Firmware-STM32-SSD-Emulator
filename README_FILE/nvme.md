@@ -158,18 +158,24 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
 
 #endif
 ```
-- **為何要用 `__attribute__((packed))`？**
-  - 在 32 位元系統中，編譯器為了存取效率，通常會將 `uint8_t` 後面填充 **1 byte** 空間來對齊 **2 bytes** 的 `uint16_t`，但在 **通訊協定中，資料是緊密排列** 的。如果不加這個屬性，struct 的大小會變成 8 bytes 而非 7 bytes，導致解析位址完全錯亂
-- **LBA vs. Length**
+- #### 記憶體對齊與 Packed Structure
+  - 在 32 位元系統中，編譯器預設會進行 Alignment (將 `uint8_t` 後面填充 **1 byte** 空間來對齊 2 bytes 的 uint16_t)
+  - 通訊協定中的資料必須緊密排列的，因此使用 `__attribute__((packed))` 強制緊湊排列，確保軟體解析位址與物理傳輸流完全一致
+  - 避免結構體大小會從 7 bytes 變成 8 bytes，導致 LBA 的解析偏移出錯
+
+- #### 邏輯定址與長度 (LBA vs. Length)
   |**欄位名稱**|**技術定義**|
   |:---|:---|
-  |**LBA (Logical Block Address)**|指指令要從磁碟的 「哪一個位置」 開始執行|
-  |**Length**|指從該位置開始，「連續操作多少個區塊」|
-- **大端序 (Big-Endian) vs. 小端序 (Little-Endian)**
-  - 大端序 (Big-Endian)：資料的高位元組 (Most Significant Byte, MSB) 放在低位址。在通訊協定（如 NVMe, TCP/IP）中，這被稱為「網路位元組序」。
-  - 小端序 (Little-Endian)：資料的低位元組 (LSB) 放在低位址。是 STM32 (ARM) 和 x86 電腦在記憶體裡存取的方式
-  - 多數的通訊協定為了標準化，規定使用大端序（網路位元組序）傳輸，而處理器（STM32）是小端序架構，為了正確解析 Host 傳來的 LBA 和 Length 數值，必須在軟體層進行 Byte Swap 操作，否則高低位元組顛倒會導致定址與長度計算完全錯誤
-  - Endianness 轉換只發生在 **Multi-byte Data Types（多位元組資料型別）** 上，NVMe 指令結構中，start_byte 和 opcode 屬於 uint8_t，它們在記憶體中只佔用單一地址，因此不存在 bytes 順序問題，而 lba 和 length 屬於 uint16_t，跨越了兩個字節。由於通訊協定規定以 Big-Endian 傳輸，而 STM32 硬體是以 Little-Endian 方式讀取 16-bit 暫存器，因此只有這兩個欄位需要進行 `__builtin_bswap16` 轉換，以確保數值的正確性。
+  |**LBA (Logical Block Address)**|指令在虛擬磁碟中操作的起始物理位置|
+  |**Length**|從 LBA 位址開始，連續操作的區塊數量|
+
+- #### 位元組序挑戰 (Endianness)
+  - **Big-Endian (大端序)**：通訊協定(NVMe, TCP/IP...網路位元組序)標準，高位元組(Most Significant Byte, MSB)放在低位址
+  - **Little-Endian (小端序)**：STM32 (ARM) 和 x86 電腦在記憶體內部處理資料的方式，資料的低位元組 (LSB) 放在低位址
+  - **通訊協定為了標準化，規定使用 Big-Endian(網路位元組序)傳輸**，而處理器(STM32)是 Little-Endian 架構，必須在 STM32 軟體層進行 Byte Swap 操作，以正確解析 Host 傳來的 LBA 和 Length 數值
+  - **Multi-byte Data Types (多位元組資料型別)** 需進行 Endianness 轉換
+    - `start_byte` 與 `opcode` 屬於 `uint8_t` (1 byte)，在記憶體中不存在順序問題
+    - `lba` 與 `length` 為 `uint16_t` (2 bytes)，因為 Host 以 Big-Endian 送出，STM32 讀取 16-bit 暫存器時會產生高低位元倒置，因此必須調用 `__builtin_bswap16` 進行手動翻轉
 
 #### `protocol.c`：指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
 ```
