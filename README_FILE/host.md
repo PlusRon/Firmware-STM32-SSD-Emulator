@@ -161,6 +161,11 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
 - 為何要用 `__attribute__((packed))`？
   - 在 32 位元系統中，編譯器為了存取效率，通常會將 `uint8_t` 後面填充 **1 byte** 空間來對齊 **2 bytes** 的 `uint16_t`
   - 但在 **通訊協定中，資料是緊密排列** 的。如果不加這個屬性，struct 的大小會變成 8 bytes 而非 7 bytes，導致解析位址完全錯亂
+  - LBA vs. Length
+    |**欄位名稱**|**技術定義**|
+    |:---|:---|
+    |**LBA (Logical Block Address)**|指指令要從磁碟的 「哪一個位置」 開始執行|
+    |**Length**|指從該位置開始，「連續操作多少個區塊」|
 
 #### `protocol.c`：指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
 ```
