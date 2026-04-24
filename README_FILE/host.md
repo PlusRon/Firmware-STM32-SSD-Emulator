@@ -242,7 +242,19 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
 - **`__builtin_bswap16` 的必要性**
   - x86 或 Python 在處理 struct.pack 時通常預設大端序（高位元組在前低位址）
   - 而 ARM Cortex-M 是小端序，例如地址 100 十六進位是 0x0064，若不經轉換，STM32 會把它讀成 0x6400 (25600)
-- 
+- **RX_BUF_SIZE (1024) 比 virtual_disk (512) 大**
+  - UART 是一個持續流入的資料流。當你的 CPU 正在處理 Protocol_Parse（例如正在算 Checksum 或印 Debug 訊息）時，DMA 仍會不停地把新資料塞進來
+  - 如果 Ring Buffer 太小（例如也只有 512 或更小），一旦 CPU 稍微忙不過來，新進來的封包就會立刻覆蓋掉還沒處理的封包，導致 **ORE (Overrun Error)**
+  - virtual_disk (512) 是為了模擬虛擬 SSD 只有 512 Byte 的容量
+  - STM32F072 的 SRAM 有限（僅 16KB）。在實驗階段，不需要開一個幾千 Byte 的陣列。512 Byte 剛好對應一個標準的**磁碟磁區（Sector）大小**，非常具有代表性
+- **限制只能讀取 16 個長度的 LBA**
+  - length 欄位有 2 Bytes，理論上可以要求讀取 65535 Bytes，但在韌體開發中，我們嚴禁完全信任 Host 端傳來的數值
+  - 如果 Host 惡意或不小心傳了一個 length = 60000
+    - 以 115200 波特率傳送 60000 Bytes 需要約 5.2 秒。在這 5.2 秒內，STM32 的 CPU 會卡在 for 迴圈裡不斷送資料，完全無法處理新的指令。
+    - 在真實系統中，這可能導致其他高優先權的任務（如馬達控制、溫度監控）被餓死（Starvation）。
+  - virtual_disk 只有 512 塊。如果讀取長度超過 512，資料就會開始重複
+  - 限制在 16，是為了讓你在 Minicom 或 Python 終端機 上能清楚看到一整行易讀的輸出。如果你一次噴 1000 個字元，畫面會亂掉，難以觀察 `defghijk...` 這種驗證字串
+- 協定支援 64KB 的傳輸，但在韌體實作中，加入了 **Payload Sanity Check（合法性檢查）**。將單次讀取限制在 16 Bytes，是為了**防止 Host 端的非法大長度請求佔用系統總線（Bus）** 過長時間，確保系統具備基本的 **Quality of Service (QoS) 與自保能力**。
 #### `main.c`：硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
 ```
 #include "stm32f072xb.h"
