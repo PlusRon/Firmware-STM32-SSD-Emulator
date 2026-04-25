@@ -1,8 +1,9 @@
 #include "protocol.h"
 #include "usart.h"
+#include "storage.h"
 
 // 模擬快閃記憶體 (NAND Flash) 的儲存空間，大小為 512 Bytes
-static uint8_t virtual_disk[512];
+// static uint8_t virtual_disk[512];
 
 void Protocol_Parse(uint8_t *packet_buf) {
     // 將輸入緩衝區強制轉換為結構體指針，方便直接透過名稱存取欄位
@@ -40,22 +41,34 @@ void Protocol_Parse(uint8_t *packet_buf) {
     }
 }
 
-void handle_nvme_read(uint16_t lba, uint16_t len) {
-    // 將長度限制在「虛擬磁碟的大小」以內，防止非法存取
-    // uint16_t safe_len = (len > 512) ? 512 : len;
 
-    UART_Send(USART1, "[ACK] READ_OK:");
-    // 限制讀取長度，避免非法存取，並循環模擬磁碟空間
-    for (int i = 0; i < (len > 16 ? 16 : len); i++) {
-        UART_SendChar(USART1, virtual_disk[(lba + i) % 512]);
+
+/**
+ * @brief 處理 NVMe 讀取指令
+ */
+void handle_nvme_read(uint16_t lba, uint16_t len) {
+    uint8_t read_data[BLOCK_SIZE];
+    Storage_Read(lba, read_data); // 透過 FTL 讀取
+
+    UART_Send(USART1, "[ACK] DATA:");
+    // 只回傳前 8 Byte 示意，避免 UART 傳輸過久
+    for (int i = 0; i < 8; i++) {
+        UART_SendChar(USART1, read_data[i]);
     }
     UART_Send(USART1, "\r\n");
 }
 
+/**
+ * @brief 處理 NVMe 寫入指令
+ */
 void handle_nvme_write(uint16_t lba, uint16_t len) {
-    // 模擬寫入邏輯：將 LBA 地址轉換為資料存入，用於後續讀取驗證
-    for (int i = 0; i < (len > 16 ? 16 : len); i++) {
-        virtual_disk[(lba + i) % 512] = (uint8_t)(lba + i);
+
+    uint8_t dummy_data[BLOCK_SIZE];
+    // 產生模擬資料：資料內容與 LBA 相關以便驗證
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        dummy_data[i] = (uint8_t)(lba + i);
     }
+
+    Storage_Write(lba, dummy_data); // 透過 FTL 寫入
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }

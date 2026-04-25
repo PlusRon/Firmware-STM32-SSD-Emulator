@@ -1,69 +1,116 @@
-import serial  # 負責串口通訊 (pySerial 庫)
-import struct  # 負責將 Python 資料型別轉換為 C 語言結構體二進位格式 (最關鍵)
-import time    # 負責延時控制
+import serial
+import struct
+import time
 
-# 定義測試主函式，參數包含：測試名稱、串口物件、指令碼、位址、長度、以及兩個錯誤注入旗標
 def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=False):
-    print(f"\n--- Running: {name} ---")
+    """
+    精確測試函式：支援二進位資料與文字混合解析
+    """
+    print(f"-> {name:20} (LBA={lba:<3})", end=': ')
     
-    # 模擬錯誤 Opcode 測試 (三元運算)
+    # 建立封包
     actual_op = 0x99 if force_bad_op else opcode
-
-    # 使用 Big-Endian (>) 封裝資料：Header(B), Opcode(B), LBA(H), Len(H)
-    # struct.pack ：
-    # '>' : 代表使用 Big-Endian (大端序) 編碼
-    # 'B' : 1 Byte (unsigned char)，對應 start_byte
-    # 'B' : 1 Byte (unsigned char)，對應 opcode
-    # 'H' : 2 Bytes (unsigned short)，對應 lba
-    # 'H' : 2 Bytes (unsigned short)，對應 length
-    raw = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
+    pkt = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
     
-    # # 模擬校驗錯誤測試，計算 Checksum
+    # 計算 Checksum
     if force_bad_cs:
-        # 故意將正確的總和 + 1，STM32 收到後算出來會對不起來
-        checksum = (sum(raw) + 1) & 0xFF # 故意讓校驗碼錯誤
+        checksum = (sum(pkt) + 1) & 0xFF
     else:
-        # sum(raw) 會累加前面 6 個 Byte 的數值，& 0xFF 是為了確保它只佔 1 Byte (0-255)
-        checksum = sum(raw) & 0xFF       # 標準計算
+        checksum = sum(pkt) & 0xFF
         
-    pkt = raw + struct.pack('B', checksum)  # 組合最終 7-byte 封包
-    ser.write(pkt)                          # 透過實體串口送出 # 呼叫底層驅動，將二進位資料經由 USB 傳送到 STM32
+    full_pkt = pkt + struct.pack('B', checksum)
     
-    time.sleep(0.2)  # 等待 Device 處理回應 # 給 STM32 一點時間運算並回傳訊息
+    try:
+        ser.write(full_pkt)
+        
+        # 增加延時確保 STM32 完成 FTL 操作與 UART 傳輸
+        time.sleep(0.3)
+        
+        if ser.in_waiting > 0:
+            raw_data = ser.read_all()
+            
+            # --- 混合解析邏輯 ---
+            # 嘗試將原始資料轉為文字觀察
+            text_part = raw_data.decode('ascii', errors='ignore').strip()
+            
+            # 狀況 A: 針對 [ACK] DATA: 的特殊處理 (解決資料看不見的問題)
+            if "DATA:" in text_part:
+                # 找出 DATA: 字串的位置，取出後面的二進位部分
+                header_len = raw_data.find(b"DATA:") + 5
+                payload = raw_data[header_len:]
+                print(f"Result: [ACK] DATA: {payload.hex(' ').upper()}")
+            
+            # 狀況 B: 針對 Checksum Mismatch 的數值處理
+            elif "Received: 0x" in text_part:
+                # 重新格式化輸出，將不可見的數值轉為 Hex
+                # 找出 Received: 0x 後面那個 Byte
+                rx_idx = raw_data.find(b"Received: 0x") + 12
+                ex_idx = raw_data.find(b"Expected: 0x") + 12
+                # 確保不越界
+                rx_val = raw_data[rx_idx] if rx_idx < len(raw_data) else 0
+                ex_val = raw_data[ex_idx] if ex_idx < len(raw_data) else 0
+                print(f"Result: [ERR] Checksum Mismatch! Received: 0x{rx_val:02X}, Expected: 0x{ex_val:02X}")
+
+            # 狀況 C: 一般文字訊息
+            else:
+                # 過濾掉可能干擾顯示的控制字元
+                clean_text = "".join(ch for ch in text_part if ch.isprintable() or ch in "\r\n")
+                print(f"Result: {clean_text.strip()}")
+        else:
+            print("Result: [Timeout] No response from STM32")
+            
+    except Exception as e:
+        print(f"Result: [Exception] {e}")
+
+# ========================================
+# 主測試流程
+# ========================================
+try:
+    # 串口設定 (請確保 Minicom 已關閉)
+    ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+    time.sleep(1) 
+    ser.reset_input_buffer()
+
+    print("="*50)
+    print("  SSD Simulator Stage 2: FTL & Protocol Integrity Test")
+    print("="*50)
+
+    # 1. 基本功能測試
+    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 5, 8)
+    test_nvme("SUCCESSFUL READ",  ser, 0x01, 5, 8)
+
+    # 2. FTL 空間管理測試 (PBA 分配與 LBA 限制)
+    print("\n--- Filling SSD (PBA Allocation) ---")
+    for i in range(17):
+        # 注意：正確的參數順序是 (name, ser, opcode, lba, length)
+        test_nvme(f"Fill-Test-{i}", ser, 0x02, i, 8)
+
+    # 3. 邊界與異常測試
+    print("\n--- Edge Case Test ---")
+    test_nvme("Read Out of Range", ser, 0x01, 99, 8)
+    test_nvme("Read Unmapped",    ser, 0x01, 30, 8)
+
+    # 4. 通訊魯棒性測試
+    print("\n--- Protocol Robustness Test ---")
+    test_nvme("CHECKSUM ATTACK",  ser, 0x02, 6, 8, force_bad_cs=True)
+    test_nvme("INVALID OPCODE",   ser, 0x99, 0, 0, force_bad_op=True)
+
+    # 5. ORE 硬體溢位壓力測試
+    print("\n--- ORE OVERFLOW TEST ---")
+    print("-> Sending 2000 bytes garbage to trigger Overrun...")
+    ser.write(b'X' * 2000)
+    # 給予較長延時，因為 STM32 需要偵測錯誤、進入主迴圈、執行重置
+    time.sleep(1.0) 
     if ser.in_waiting > 0:
-        # read_all() 讀取所有回傳資料
-        # decode('ascii') 將二進位轉回文字，errors='ignore' 防止因為亂碼導致程式崩潰
         res = ser.read_all().decode('ascii', errors='ignore').strip()
         print(f"Result: {res}")
+    else:
+        print("Result: No response (Check if LED stopped blinking - HardFault?)")
 
-try:
-    # 初始化序列埠，115200, N, 8, 1
-    # 初始化 /dev/ttyUSB0 (Linux 格式)，波特率 115200 必須與 STM32 一致
-    ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-    time.sleep(1)   # 硬體重置後通常需要 1 秒讓電位穩定
-    ser.reset_input_buffer()  # 清除啟動時可能產生的雜訊資料
+    ser.close()
+    print("\n" + "="*50)
+    print("           All Tests Completed")
+    print("="*50)
 
-    # 1. 冒煙測試：基本讀寫功能，成功案例 (Write & Read)
-    # 測試 A：正常寫入指令 (LBA 100, 長度 8)
-    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 100, 8)
-
-    # 測試 B：正常讀取指令 (確認剛才寫入的資料)
-    test_nvme("SUCCESSFUL READ",  ser, 0x01, 100, 8)
-
-    # 2. 魯棒性測試：故意傳送 Checksum 錯誤的封包, Checksum 攻擊，測試 STM32 是否會被損壞的封包騙到
-    test_nvme("CHECKSUM ERROR TEST", ser, 0x02, 200, 8, force_bad_cs=True)
-
-    # 3. 語義測試：傳送未定義的指令、不支援的指令 (Invalid Opcode),非法指令攻擊，測試 STM32 的邊界檢查是否有效
-    test_nvme("INVALID OPCODE TEST", ser, 0x99, 0, 0, force_bad_op=True)
-
-    # 4. 硬體溢位 壓力與異常測試：模擬 Host 端產生過載 (Overrun)，模擬 ORE (一次噴大量垃圾數據塞爆 Buffer)
-    print("\n--- Running: ORE OVERFLOW TEST ---")
-    ser.write(b'X' * 2000) # 噴 2000 個字元，超過 rx_buffer 的 1024 緩衝區的數據量
-    time.sleep(0.5)
-    if ser.in_waiting > 0:
-        res = ser.read_all().decode('ascii', errors='ignore')
-        print(f"Result: {res}")
-
-    ser.close()  # 養成好習慣，結束後關閉資源
 except Exception as e:
-    print(f"Error: {e}")
+    print(f"\n[FATAL ERROR]: {e}")

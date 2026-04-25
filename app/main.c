@@ -4,6 +4,8 @@
 #include "dma.h"
 #include "usart.h"
 #include "protocol.h"
+#include "storage.h"
+
 
 #define RX_BUF_SIZE 1024
 uint8_t rx_buffer[RX_BUF_SIZE];  // 定義 1KB 的接收緩衝區
@@ -25,17 +27,21 @@ void System_Init(void){
     UART_Init(USART1, 69);     // 設定波特率 115200
     *NVIC_ISER = (1UL << 27);  // 開啟中斷向量表中的 UART1 中斷
     SysTick_Init(8000);        // 1ms 系統滴答
+    
+    // 初始化 FTL 核心邏輯
+    Storage_Init();
+
 }
 
 
 int main(void) {
-
+    // 1. 硬體初始化
     System_Init();
 
     uint32_t last_blink = 0;
     uint8_t led_state = 0;
 
-    UART_Send(USART1, "\r\n--- NVMe diagnostics Mode ---\r\n");
+    UART_Send(USART1, "\r\n--- SSD Simulator Stage 2 Started ---\r\n");
 
     while (1) {
         // --- 錯誤處理：硬體溢位 (ORE) ---
