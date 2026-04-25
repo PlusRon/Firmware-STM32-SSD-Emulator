@@ -468,7 +468,7 @@ except Exception as e:
   |**Smoke Test**|SUCCESSFUL WRITE/READ|驗證基本通訊與 LBA 寫入讀取的邏輯正確性|
   |**Robustness**|CHECKSUM ERROR TEST|驗證數據校驗攔截機制，模擬信號干擾情境|
   |**Semantic**|INVALID OPCODE TEST|驗證指令集解析的完備性與非法指令防禦|
-Hardware,ORE OVERFLOW TEST,驗證 DMA Ring Buffer 耗盡後的硬體旗標自癒與重置。
+  |Hardware|ORE OVERFLOW TEST|驗證 DMA Ring Buffer 耗盡後的硬體旗標自癒與重置|
 - #### System-Level Thinking
   - **自動化測試(Unit Testing)**：取代手動輸入，透過腳本實現一鍵式回歸測試，注入錯誤來驗證系統的健壯性（Robustness）
   - **端到端**：從 **物理層 (UART/DMA)** 到 **協定層 (Protocol)**，最後到 **驅動層 (Python Test Script)**，完整掌握數據在系統中的生命週期
