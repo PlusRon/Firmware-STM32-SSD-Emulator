@@ -283,7 +283,7 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
 uint8_t rx_buffer[RX_BUF_SIZE];  // 定義 1KB 的接收緩衝區
 uint16_t rd_ptr = 0;             // 軟體讀取指標 (Software Read Pointer)
 
-int main(void) {
+void System_Init(void){
     /* 硬體底層初始化節點 */
     RCC->APB2ENR |= (1UL << 14);   // 開啟 USART1 時鐘
     RCC->AHBENR  |= (1UL << 0);    // 開啟 DMA1 時鐘
@@ -299,11 +299,17 @@ int main(void) {
     UART_Init(USART1, 69);     // 設定波特率 115200
     *NVIC_ISER = (1UL << 27);  // 開啟中斷向量表中的 UART1 中斷
     SysTick_Init(8000);        // 1ms 系統滴答
+}
+
+
+int main(void) {
+
+    System_Init();
 
     uint32_t last_blink = 0;
     uint8_t led_state = 0;
 
-    UART_Send(USART1, "\r\n--- Diagnostics Mode Active ---\r\n");
+    UART_Send(USART1, "\r\n--- NVMe diagnostics Mode ---\r\n");
 
     while (1) {
         // --- 錯誤處理：硬體溢位 (ORE) ---
