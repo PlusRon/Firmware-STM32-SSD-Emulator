@@ -493,16 +493,40 @@ except Exception as e:
   - 執行主機端腳本, 模擬真實的 NVMe 主機(Host)
   - 會把 **`0xA5` (起始位元)、`0x01` (Read Opcode)、LBA** 等資料包裝成一個 **7-byte 封包** 送出去
 
-## 整體測試的邏輯流向（意義）
-- **Python 腳本** ：把人類看得懂的 `要讀 LBA 10` 打包成二進位封包
-- **USB-to-UART** ：封包透過電線傳給 STM32
-- **STM32 DMA** ：完全不驚動 CPU，靜悄悄地把資料存進 `rx_buffer`
-- **Main Loop** ：發現 `rd_ptr != wr_ptr`，STM32 開始掃描讀取 RING BUFFER
-- **Protocol Parser** ：看到 `0xA5`，檢查 **Checksum**
-- **觸發斷點** ：如果封包正確，CPU 會停在 `handle_nvme_read`
-- **總結**
-  - 封包同步機制：處理流式資料中的封包邊界問題。
-  - 數據完整性 (Data Integrity)：透過 Checksum 保護指令。
-  - 異構系統通訊：解決 PC 與 MCU 之間的 Endianness 問題。
-  - 硬體資源優化：利用 DMA 實作高效率 Ring Buffer。
-  - 異常處理機制：主動偵測並從硬體溢位 (ORE) 中自癒。
+## 五、結論
+### 系統運作流程與測試邏輯 (Logic Flow)
+- #### 資料封裝 (Python Host)
+  - 將人類可讀的指令（如：讀取 LBA 10）透過 `struct.pack` 序列化為二進位封包
+- #### 實體傳輸 (Physical Layer)
+  - 封包經由 USB-to-UART 轉換器，透過串列通訊傳送至 STM32
+- #### 零負載接收 (Hardware STM32 DMA)
+  - STM32 的 DMA 控制器在不驚動 CPU 的情況下，靜悄悄地將資料即時存入 rx_buffer
+- #### 指標監控 (Main Loop)
+  - 系統持續偵測 `rd_ptr != wr_ptr`，一旦硬體寫入指標變動，立即啟動 Ring Buffer 掃描
+- #### 協定解析與驗證 (Protocol Parser)
+  - **同步 (Sync)**：定位 0xA5 標頭以對齊封包邊界
+  - **校驗 (Integrity)**：計算並驗證 Checksum，確保指令未在傳輸中變質
+  - **轉換 (Endianness)**：處理異構系統通訊， PC (Big-Endian) 與 MCU (Little-Endian) 的位元組序差異
+- #### 指令執行 (Execution)
+  - 封包驗證通過後，觸發斷點或跳轉至 `handle_nvme_read/write` 執行模擬閃存操作
+
+### 核心價值 (Core Engineering Values)
+- #### 數據完整性 (Data Integrity)
+  - 透過 Checksum 演算法保護指令流，模擬真實工業環境中的雜訊處理
+  - 實作 Diagnostic (診斷型) 錯誤回應，主動告知 Host 預期與實際校驗值的差異，極大化除錯效率
+- #### 異構系統通訊與位元組序
+  - 理解跨平台開發中的 Endianness (位元組序) 問題，並在韌體層實作無損轉換
+- #### 硬體資源與效能優化 (Efficiency)
+  - **DMA Ring Buffer**：展示了**生產者-消費者模型**，最大限度減少中斷頻率，釋放 CPU 運算資源
+  - **非阻塞設計**：確保系統在等待資料傳輸時，背景心跳燈仍能正常運作，不產生死機 (Hanging)
+- #### 系統級異常自癒機制 (Hardware Robustness)
+  - **ORE (Overrun Error) 處理**：主動偵測硬體溢位並實作**自動復位 (Reset-and-Sync)**，模擬 SSD 控制器在高負載下的穩定性挑戰
+
+### 測試思維 (Testing Methodology)
+- #### 自動化單元測試 (Unit Testing)
+  - 捨棄手動調試，撰寫 Python 腳本實作一鍵式回歸測試，確保每次修改碼後功能依然正確
+- #### 負向測試 (Negative Testing)
+  - 具備攻擊者思維，透過**錯誤注入**驗證系統在極端情況（非法指令、校驗錯誤、硬體過載）下的行為
+- #### 魯棒性驗證 (Robustness)
+  - 模擬 Host 端產生 Overrun Error 的場景，驗證系統在極度壓力下的恢復能力，這是開發高品質儲存產品的關鍵指標
+
