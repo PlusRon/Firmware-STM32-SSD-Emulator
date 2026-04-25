@@ -14,7 +14,7 @@
 - [硬體抽象層：stm32f072xb.h 底層暫存器定義實作](#stm32f072xbh-底層暫存器定義實作)
 - [應用邏輯層：GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](#GPIO-原子性操作-BSRRSysTick-非阻塞時基系統)
 - [應用邏輯層：UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](#UART-非阻斷式非同步收發資料處理-UARTDMARing-BufferIDLEFlow-ControlSystem-Tick)
-- [模擬 NVMe 通訊協定規範 (Protocol Specification)：DMA Ring Buffers、Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](#模擬 NVMe-通訊協定規範-Protocol-Specification-DMA-Ring-BuffersProducer-Consumer-modelChecksumEndiannessOREUnit-Testing)
+- [應用邏輯層：模擬 NVMe 通訊協定規範 (Protocol Specification)：DMA Ring Buffers、Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](#模擬-NVMe-通訊協定規範-Protocol-Specification-DMA-Ring-BuffersProducer-Consumer-modelChecksumEndiannessOREUnit-Testing)
 #### [自動化建置系統 STM32 Makefile](#四自動化建置系統-STM32-Makefile)
 #### [除錯 (Debugging)](#五除錯-Debugging)
 
