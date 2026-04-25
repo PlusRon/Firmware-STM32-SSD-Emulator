@@ -358,10 +358,10 @@ try:
     # 我們的物理空間只有 16 個區塊
     print("\n--- Filling SSD ---")
     for i in range(17):
-        test_nvme(ser, f"Fill-Test-{i}", 0x02, i, 8)
+        test_nvme(f"Fill-Test-{i}", ser, 0x02, i, 8)
 
     # 測試 3: 讀取未映射地址
-    test_nvme(ser, "Unmapped Read", 0x01, 99, 8)
+    test_nvme("Unmapped Read", ser, 0x01, 99, 8)
 
     # 2. 魯棒性測試：故意傳送 Checksum 錯誤的封包, Checksum 攻擊，測試 STM32 是否會被損壞的封包騙到
     test_nvme("CHECKSUM ERROR TEST", ser, 0x02, 6, 8, force_bad_cs=True)
