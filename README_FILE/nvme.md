@@ -1,4 +1,13 @@
-# HOST NVMe Protocol
+# 模擬 NVMe 通訊協定規範 (Protocol Specification)
+
+- #### High-Efficiency Data Flow
+  - Implemented **DMA Circular Buffers** and a **Producer-Consumer model** to minimize CPU overhead during 115200 bps UART transmission
+- #### Cross-Platform Data Integrity
+  - **Checksum** verification and handled **Endianness** challenges between PC and STM32
+- #### System Robustness
+  - **UART ORE (Overrun Error) self-healing mechanism** and applied **Defensive Programming** performs input validity checks and limits access length through **QoS** policies to prevent system hanging from malicious inputs
+- #### Automation
+  - Python-based Host Driver(**pySerial**) for **Negative Testing**, **Error Injection** and **automated validation** of the **NVMe read/write** command set
 ## 一、環境建置
 ### 查看 python 版本
 ```
@@ -128,7 +137,8 @@ Linux 執行 `pyserial` 存取 `/dev/ttyUSB0` (STM32) 時，最常卡住的是 *
 
 ## 三、程式碼
 
-#### `protocol.h`：通訊協定的規格定義，定義了 Host (電腦) 與 Device (STM32) 溝通的語言格式
+### `protocol.h`：通訊協定的規格定義
+定義了 Host (電腦) 與 Device (STM32) 溝通的語言格式
 ```
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
@@ -158,20 +168,27 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
 
 #endif
 ```
-- **為何要用 `__attribute__((packed))`？**
-  - 在 32 位元系統中，編譯器為了存取效率，通常會將 `uint8_t` 後面填充 **1 byte** 空間來對齊 **2 bytes** 的 `uint16_t`，但在 **通訊協定中，資料是緊密排列** 的。如果不加這個屬性，struct 的大小會變成 8 bytes 而非 7 bytes，導致解析位址完全錯亂
-- **LBA vs. Length**
+- #### 記憶體對齊與 Packed Structure
+  - 在 32 位元系統中，編譯器預設會進行 Alignment (將 `uint8_t` 後面填充 **1 byte** 空間來對齊 2 bytes 的 uint16_t)
+  - 通訊協定中的資料必須緊密排列的，因此使用 `__attribute__((packed))` 強制緊湊排列，確保軟體解析位址與物理傳輸流完全一致
+  - 避免結構體大小會從 7 bytes 變成 8 bytes，導致 LBA 的解析偏移出錯
+
+- #### 邏輯定址與長度 (LBA vs. Length)
   |**欄位名稱**|**技術定義**|
   |:---|:---|
-  |**LBA (Logical Block Address)**|指指令要從磁碟的 「哪一個位置」 開始執行|
-  |**Length**|指從該位置開始，「連續操作多少個區塊」|
-- **大端序 (Big-Endian) vs. 小端序 (Little-Endian)**
-  - 大端序 (Big-Endian)：資料的高位元組 (Most Significant Byte, MSB) 放在低位址。在通訊協定（如 NVMe, TCP/IP）中，這被稱為「網路位元組序」。
-  - 小端序 (Little-Endian)：資料的低位元組 (LSB) 放在低位址。是 STM32 (ARM) 和 x86 電腦在記憶體裡存取的方式
-  - 多數的通訊協定為了標準化，規定使用大端序（網路位元組序）傳輸，而處理器（STM32）是小端序架構，為了正確解析 Host 傳來的 LBA 和 Length 數值，必須在軟體層進行 Byte Swap 操作，否則高低位元組顛倒會導致定址與長度計算完全錯誤
-  - Endianness 轉換只發生在 **Multi-byte Data Types（多位元組資料型別）** 上，NVMe 指令結構中，start_byte 和 opcode 屬於 uint8_t，它們在記憶體中只佔用單一地址，因此不存在 bytes 順序問題，而 lba 和 length 屬於 uint16_t，跨越了兩個字節。由於通訊協定規定以 Big-Endian 傳輸，而 STM32 硬體是以 Little-Endian 方式讀取 16-bit 暫存器，因此只有這兩個欄位需要進行 `__builtin_bswap16` 轉換，以確保數值的正確性。
+  |**LBA (Logical Block Address)**|指令在虛擬磁碟中操作的起始物理位置|
+  |**Length**|從 LBA 位址開始，連續操作的區塊數量|
 
-#### `protocol.c`：指令執行與校驗邏輯，模擬 SSD 控制器的核心邏輯層
+- #### 位元組序挑戰 (Endianness)
+  - **Big-Endian (大端序)**：通訊協定(NVMe, TCP/IP...網路位元組序)標準，高位元組(Most Significant Byte, MSB)放在低位址
+  - **Little-Endian (小端序)**：STM32 (ARM) 和 x86 電腦在記憶體內部處理資料的方式，資料的低位元組 (LSB) 放在低位址
+  - **通訊協定為了標準化，規定使用 Big-Endian(網路位元組序)傳輸**，而處理器(STM32)是 Little-Endian 架構，必須在 STM32 軟體層進行 Byte Swap 操作，以正確解析 Host 傳來的 LBA 和 Length 數值
+  - **Multi-byte Data Types (多位元組資料型別)** 需進行 Endianness 轉換
+    - `start_byte` 與 `opcode` 屬於 `uint8_t` (1 byte)，在記憶體中不存在順序問題
+    - `lba` 與 `length` 為 `uint16_t` (2 bytes)，因為 Host 以 Big-Endian 送出，STM32 讀取 16-bit 暫存器時會產生高低位元倒置，因此必須調用 `__builtin_bswap16` 進行手動翻轉
+
+### `protocol.c`：負責模擬 SSD 控制器的 運算層 (Execution Layer)
+包含指令解析與執行、數據校驗及空間映射
 ```
 #include "protocol.h"
 #include "usart.h"
@@ -235,27 +252,34 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }
 ```
-- **CheckSum**
-  - 設計 Checksum 驗證機制時，不僅單純回傳錯誤訊息，還將 STM32 計算出的預期校驗值回傳給 Host，才能快速定位 傳輸完整性 (Signal Integrity) 問題。Diagnostic (診斷型) 回應 能大幅縮短硬體除錯的時間
-    - 預期值與 Host 端一致：校驗碼欄位受損
-    - 預期值不符：指令數據 (Payload) 在傳輸路徑中產生了雜訊干擾，
-- **`__builtin_bswap16` 的必要性**
-  - x86 或 Python 在處理 struct.pack 時通常預設大端序（高位元組在前低位址）
-  - 而 ARM Cortex-M 是小端序，例如地址 100 十六進位是 0x0064，若不經轉換，STM32 會把它讀成 0x6400 (25600)
-- **RX_BUF_SIZE (1024) 比 virtual_disk (512) 大**
-  - UART 是一個持續流入的資料流。當你的 CPU 正在處理 Protocol_Parse（例如正在算 Checksum 或印 Debug 訊息）時，DMA 仍會不停地把新資料塞進來
-  - 如果 Ring Buffer 太小（例如也只有 512 或更小），一旦 CPU 稍微忙不過來，新進來的封包就會立刻覆蓋掉還沒處理的封包，導致 **ORE (Overrun Error)**
-  - virtual_disk (512) 是為了模擬虛擬 SSD 只有 512 Byte 的容量
-  - STM32F072 的 SRAM 有限（僅 16KB）。在實驗階段，不需要開一個幾千 Byte 的陣列。512 Byte 剛好對應一個標準的**磁碟磁區（Sector）大小**，非常具有代表性
-- **限制只能讀取 16 個長度的 LBA**
-  - length 欄位有 2 Bytes，理論上可以要求讀取 65535 Bytes，但在韌體開發中，我們嚴禁完全信任 Host 端傳來的數值
-  - 如果 Host 惡意或不小心傳了一個 length = 60000
-    - 以 115200 波特率傳送 60000 Bytes 需要約 5.2 秒。在這 5.2 秒內，STM32 的 CPU 會卡在 for 迴圈裡不斷送資料，完全無法處理新的指令。
-    - 在真實系統中，這可能導致其他高優先權的任務（如馬達控制、溫度監控）被餓死（Starvation）。
-  - virtual_disk 只有 512 塊。如果讀取長度超過 512，資料就會開始重複
-  - 限制在 16，是為了讓你在 Minicom 或 Python 終端機 上能清楚看到一整行易讀的輸出。如果你一次噴 1000 個字元，畫面會亂掉，難以觀察 `defghijk...` 這種驗證字串
-- 協定支援 64KB 的傳輸，但在韌體實作中，加入了 **Payload Sanity Check（合法性檢查）**。將單次讀取限制在 16 Bytes，是為了**防止 Host 端的非法大長度請求佔用系統總線（Bus）** 過長時間，確保系統具備基本的 **Quality of Service (QoS) 與自保能力**。
-#### `main.c`：硬體驅動與 DMA Ring Buffer 管理，是系統穩定性的靈魂，負責在高負載下確保資料不遺失
+- #### 數據校驗機制 (Checksum Verification)
+  - 確保指令在傳輸路徑中的完整性 (Signal Integrity)，實作 8-bit 累加校驗
+  - **診斷型回應 (Diagnostic Response)**：當 Checksum 失敗時，系統不僅回傳錯誤代碼，也回傳 STM32 計算出的預期值 (Expected) 與 實際接收值 (Received)
+    |預期值與 Host 一致|預期值與 Host 不符|
+    |:---:|:---:|
+    |代表數據段正確，僅校驗碼位元受損|代表指令數據 (Payload) 遭受雜訊干擾，導致 Bit Flip|
+- #### 位元組序翻轉 (Endianness Conversion)
+  - 通訊協定（如 Python `struct.pack`）預設使用 大端序 (Big-Endian) 傳輸，而 ARM Cortex-M (STM32) 為 小端序 (Little-Endian) 架構，系統必須進行顯式轉換
+  - 使用 **編譯器內建** 指令 `__builtin_bswap16` 進行硬體級翻轉，避免位址解析錯誤（例如將 LBA 100 解析為 25600），確保地址映射的精確性
+- #### 多層級緩衝區架構 (Buffer Management)
+  |RX_BUF_SIZE (1024 Bytes)|Virtual Disk (512 Bytes)|
+  |:---|:---|
+  |通訊層緩衝區|模擬 SSD 儲存空間|
+  |提供充足的**流量控制 (Flow Control)** 空間。當 CPU 正在處理校驗或中斷時，DMA 仍可持續搬運資料。較大的 Buffer 可有效**避免 Overrun Error (ORE)** 導致的封包遺失|對應標準 **磁碟磁區 (Sector Size)**，在有限的 SRAM (16KB) 中實現具備代表性的儲存模擬|
+
+- #### 指令合法性檢查 (Payload Sanity Check)
+  - 協定理論支援 64KB 傳輸，但在韌體實作中採取 **防禦性編程 (Defensive Programming)**，不信任任何外部輸入
+  - 讀取長度限制 (Quality of Service, QoS 策略)：將單次讀取強制限制為 16 Bytes
+  - **防止總線霸佔 (Bus Hogging)**：避免長達數秒(讀取長資料)的 UART 傳輸導致系統任務 **飢餓 (Starvation)**，確保馬達控制或溫度監控等高優先權任務的即時性
+  - **系統自保 (Self-Protection)**：防止 Host 端因惡意或錯誤的大長度請求，導致系統卡死
+  - **可觀測性 (Observability)**：確保 Debug 終端機能輸出整齊、易讀的驗證字串，提升除錯效率
+- #### 循環定址模擬
+  - 透過 `(lba + i) % 512` 實作循環邊界處理
+  - 確保在模擬環境下，即使 LBA 超出範圍，系統仍能安全運行，防止 **記憶體非法存取 (Out-of-bounds Access)**
+
+
+### `main.c`：負責管理底層硬體資源
+透過 DMA 環形緩衝區 (Circular Buffer) 技術，在高傳輸負載下確保數據處理的完整性與系統穩定性
 ```
 #include "stm32f072xb.h"
 #include "gpio.h"
@@ -268,7 +292,7 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
 uint8_t rx_buffer[RX_BUF_SIZE];  // 定義 1KB 的接收緩衝區
 uint16_t rd_ptr = 0;             // 軟體讀取指標 (Software Read Pointer)
 
-int main(void) {
+void System_Init(void){
     /* 硬體底層初始化節點 */
     RCC->APB2ENR |= (1UL << 14);   // 開啟 USART1 時鐘
     RCC->AHBENR  |= (1UL << 0);    // 開啟 DMA1 時鐘
@@ -284,11 +308,17 @@ int main(void) {
     UART_Init(USART1, 69);     // 設定波特率 115200
     *NVIC_ISER = (1UL << 27);  // 開啟中斷向量表中的 UART1 中斷
     SysTick_Init(8000);        // 1ms 系統滴答
+}
+
+
+int main(void) {
+
+    System_Init();
 
     uint32_t last_blink = 0;
     uint8_t led_state = 0;
 
-    UART_Send(USART1, "\r\n--- Diagnostics Mode Active ---\r\n");
+    UART_Send(USART1, "\r\n--- NVMe diagnostics Mode ---\r\n");
 
     while (1) {
         // --- 錯誤處理：硬體溢位 (ORE) ---
@@ -332,31 +362,33 @@ int main(void) {
     }
 }
 ```
-- DMA Ring Buffer 的優勢
-  - 展示了 **生產者-消費者模型 (Producer-Consumer Model)**
-  - DMA 是生產者，負責搬資料；while(1) 是消費者，負責解析資料
-  - 這種設計讓 UART 接收不需要頻繁進出中斷服務程式（ISR），極大地降低了 CPU 負荷，這也是處理 NVMe 高速指令流的必備技術
-- **`USART1->ICR |= 0xFFFFFFFF;`** 的功用
-  - 硬體設計中常見的 **"Write 1 to Clear" (W1C)** 機制
-  - ICR (Interrupt Flag Clear Register) 裡面包含了很多旗標（如 ORE、IDLE、TC、TXE 等）
-  - 硬體暫存器（Register）中，狀態位元（如錯誤旗標）是由硬體電路自動設為 1 的，確保軟體在清除這些旗標時，不會因為「**讀取-修改-寫入（Read-Modify-Write）**」的過程誤改到其他位元，因此設計成 **寫入 0 無效，寫入 1 則觸發重置電路將該位元歸零**
-- ***NVIC_ISER = (1UL << 27);**
-  - NVIC (Nested Vectored Interrupt Controller)：這是 ARM Cortex-M 核心內部的**中斷控制器**
-  - ISER (Interrupt Set-Enable Register)：這是用來「致能」特定中斷的暫存器
-  - STM32F072 的資料手冊（Datasheet），USART1 的全局中斷在向量表中的編號（IRQ Number）正是 27
-  - 分層授權：即便你在 USART1->CR1 裡面開啟了 IDLE 中斷，如果 NVIC 沒把 27 號通道打開，CPU 永遠不會理會這個中斷請求。
-  - 硬體過濾：這讓開發者可以**精確控制哪些硬體可以打斷 CPU 的執行**，一旦 UART 滿足中斷條件，硬體會強行保存當前 CPU 暫存器狀態，並跳轉至我們定義的 USART1_IRQHandler 函式執行
-- CNDTR 的計算與 available 的邏輯差異
-  - **DMA_Get_Write_Index 的邏輯**
-    - CNDTR (Current Number of Data to Transfer) 在 DMA 模式下是一個 **倒數計數器(剩餘空間)**
-    - `目前寫入位置 (wr_ptr) = 總大小 - 剩餘計數`
-  - **為什麼 available 不能直接用 CNDTR**
-    - wr_ptr (DMA 提供)：告訴你「最新的一筆資料剛被放在哪裡」。
-    - rd_ptr (軟體提供)：告訴你「你的程式上次處理到哪裡」。
-    - available (計算得出)：告訴你「還有多少尚未處理的資料」。
-- 雙指標環形緩衝區管理。硬體端透過監控 DMA 的 CNDTR 暫存器來自動更新 Write Pointer；軟體端則維護一個 Read Pointer。透過兩者的差值計算出 available 資料量，這能確保我在非阻塞的環境下，精確判斷何時緩衝區內已積累足夠的完整封包（7 Bytes）供協定層解析，同時避免重複處理已讀取的舊資料。
-#### `host_sender.py`：Host 端驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性
-Host Driver（主機驅動程式），會根據定義好的協定，將指令「打包」成二進位流，並透過串口送給 STM32 驗證
+- #### 生產者-消費者模型 (Producer-Consumer Model)
+  - **生產者 (Producer)**：由 DMA1 Channel 2 擔任，負責將 UART 接收到的原始數據自動搬運至 rx_buffer，無需 CPU 介入
+  - **消費者 (Consumer)**：於 `while(1)` 主迴圈執行，負責根據協定邏輯解析緩衝區中的數據
+  - 避免了頻繁進出中斷服務程式 (ISR) 導致的**上下文切換 (Context Switch)** 開銷，是處理 NVMe 高速指令流的工業級標準做法
+- #### 雙指標環形緩衝區管理 (Dual-Pointer Management)
+  - 在 **非阻塞 (Non-blocking)** 環境下精確管理數據，系統維護了兩個關鍵指標
+  - **硬體寫入指標 (wr_ptr)**：透過監控 DMA 的 CNDTR 暫存器即時計算獲得
+    - `wr_ptr = Total_Size - CNDTR` (由於 CNDTR 是倒數計數器, 紀錄剩餘空間)
+  - **軟體讀取指標 (rd_ptr)**：由軟體維護，標記**目前處理到的位置**
+  - **可用數據量 (available)**：
+    - `(wr_ptr >= rd_ptr) ? (wr_ptr - rd_ptr) : (RX_BUF_SIZE - rd_ptr + wr_ptr)
+    - CNDTR 僅反映硬體填充進度，唯有結合 `rd_ptr` 才能得知**真正尚未處理的數據量**，確保指令不遺漏、不重複(避免重複處理已讀取的舊資料)、精確判斷何時緩衝區內已積累足夠的完整封包(7 Bytes)
+- #### 硬體層級的安全保障機制
+  - **W1C (Write 1 to Clear) 機制**： `USART1->ICR |= 0xFFFFFFFF;`，硬體旗標（如溢位錯誤 ORE）由電路自動置位。採用 **寫 1 清除** 邏輯可**避免 讀取-修改-寫入** 過程中產生的 **競態條件 (Race Condition)**，確保狀態清除的原子性
+  - **NVIC 分層授權管理**：`*NVIC_ISER = (1UL << 27);` (開啟 **IRQ 27：USART1**)，即便外設配置正確，若無 NVIC 的全域授權，CPU 仍不會響應中斷。這提供了精確的硬體過濾功能，讓開發者能嚴格控制 CPU 的執行時機
+- #### ORE (Overrun Error) 偵測與自癒
+  - 當系統處理速度無法跟上資料流入速度時，硬體會觸發 ORE 旗標
+  - 系統主動偵測此異常，並執行診斷回應（發送 `[SYS] ORE_ERROR`），隨後立即重置 DMA 鏈路
+  - 防止傳輸鏈路永久卡死，確保系統在遭遇極端高壓後能自動恢復正常運作
+- #### 指令同步機制 (Command Synchronization)
+  - UART 為流式傳輸，封包邊界可能位移
+  - 解析器會掃描 rx_buffer 尋找同步字頭 0xA5
+  - 若首字節不符，系統會逐位元偏移讀取指標 (rd_ptr++) 重新搜尋，具備強大的數據流自校正能力
+
+### `host_sender.py`：驗證與自動化測試
+ Host Driver (主機驅動程式) 為驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性。負責將抽象的指令封裝為符合規格的二進位流 (Binary Stream)，並透過 Python 實作自動化測試與 **錯誤注入 (Error Injection)** 機制，並透過串口送給 STM32 驗證
+
 ```
 import serial  # 負責串口通訊 (pySerial 庫)
 import struct  # 負責將 Python 資料型別轉換為 C 語言結構體二進位格式 (最關鍵)
@@ -428,10 +460,33 @@ try:
 except Exception as e:
     print(f"Error: {e}")
 ```
-- 自動化測試 (Unit Testing)：你會撰寫測試工具來驗證你的韌體。
-- 負向測試 (Negative Testing)：你懂得「注入錯誤」來驗證系統的健壯性（Robustness），而不是只測會通的功能。
-- 封包分析能力：你理解 struct.pack、Big-Endian 這些在嵌入式開發中極為重要的底層概念。
-- 系統級思維：你模擬了 Host 端產生 Overrun Error 的場景，這是在開發 SSD 控制器時最常遇到的穩定性挑戰之一。
+- #### 跨平台封包封裝 (Data Serialization)
+  - 利用 Python 的 `struct` 庫解決高級語言與 C 語言結構體之間的數據轉換問題
+  - 使用 `struct.pack('>BBHH', ...)` 顯式指定 **Big-Endian (大端序)** 編碼
+  - 確保 Host 端產生的位元組流符合 NVMe 與網路傳輸協定的標準，模擬真實的異質系統通訊
+- #### 錯誤注入與負向測試 (Negative Testing)
+  - **校驗碼攻擊 (Checksum Injection)**
+    - 故意計算錯誤的 Checksum 並發送
+    - 驗證 Device 端是否能精確攔截受損封包，防止無效數據進入邏輯層
+  - **非法指令攻擊 (Opcode Fuzzing)**
+    - 發送未定義的操作碼（如 `0x99`）
+    - 驗證韌體的 **邊界檢查 (Boundary Check)** 能力，確保系統不會因未知指令而產生未定義行為 (Undefined Behavior) 或當機
+  - **硬體溢位壓力測試 (Overrun Stress Test)**
+    - 一次性爆發式傳送 2000 Bytes 的數據（遠超 Device 端 1024 Bytes 的接收緩衝區）
+    - 模擬 Host 端產生過載，驗證 Device 端處理 **ORE (Overrun Error)** 硬體旗標與**自我復原 (Self-Recovery)** 的魯棒性
+- #### 診斷與監控 (Diagnostics)
+  - **ASCII 解碼與錯誤容忍**：使用 `.decode('ascii', errors='ignore')` 讀取回傳值
+  - 即便 Device 端因為故障回傳了亂碼，測試腳本仍能保持運行而不崩潰，並記錄下 Device 端最後的遺言作為除錯依據
+- #### 測試案例清單 (Test Cases)
+  |測試類型|案例名稱|驗證重點|
+  |:---|:---|:---|
+  |**Smoke Test**|SUCCESSFUL WRITE/READ|驗證基本通訊與 LBA 寫入讀取的邏輯正確性|
+  |**Robustness**|CHECKSUM ERROR TEST|驗證數據校驗攔截機制，模擬信號干擾情境|
+  |**Semantic**|INVALID OPCODE TEST|驗證指令集解析的完備性與非法指令防禦|
+  |Hardware|ORE OVERFLOW TEST|驗證 DMA Ring Buffer 耗盡後的硬體旗標自癒與重置|
+- #### System-Level Thinking
+  - **自動化測試(Unit Testing)**：取代手動輸入，透過腳本實現一鍵式回歸測試，注入錯誤來驗證系統的健壯性（Robustness）
+  - **端到端**：從 **物理層 (UART/DMA)** 到 **協定層 (Protocol)**，最後到 **驅動層 (Python Test Script)**，完整掌握數據在系統中的生命週期
 
 
 ## 四、執行 Host Driver 與 GDB 驗證 (測試層)
@@ -453,16 +508,40 @@ except Exception as e:
   - 執行主機端腳本, 模擬真實的 NVMe 主機(Host)
   - 會把 **`0xA5` (起始位元)、`0x01` (Read Opcode)、LBA** 等資料包裝成一個 **7-byte 封包** 送出去
 
-## 整體測試的邏輯流向（意義）
-- **Python 腳本** ：把人類看得懂的 `要讀 LBA 10` 打包成二進位封包
-- **USB-to-UART** ：封包透過電線傳給 STM32
-- **STM32 DMA** ：完全不驚動 CPU，靜悄悄地把資料存進 `rx_buffer`
-- **Main Loop** ：發現 `rd_ptr != wr_ptr`，STM32 開始掃描讀取 RING BUFFER
-- **Protocol Parser** ：看到 `0xA5`，檢查 **Checksum**
-- **觸發斷點** ：如果封包正確，CPU 會停在 `handle_nvme_read`
-- **總結**
-  - 封包同步機制：處理流式資料中的封包邊界問題。
-  - 數據完整性 (Data Integrity)：透過 Checksum 保護指令。
-  - 異構系統通訊：解決 PC 與 MCU 之間的 Endianness 問題。
-  - 硬體資源優化：利用 DMA 實作高效率 Ring Buffer。
-  - 異常處理機制：主動偵測並從硬體溢位 (ORE) 中自癒。
+## 五、結論
+### 系統運作流程與測試邏輯 (Logic Flow)
+- #### 資料封裝 (Python Host)
+  - 將人類可讀的指令（如：讀取 LBA 10）透過 `struct.pack` 序列化為二進位封包
+- #### 實體傳輸 (Physical Layer)
+  - 封包經由 USB-to-UART 轉換器，透過串列通訊傳送至 STM32
+- #### 零負載接收 (Hardware STM32 DMA)
+  - STM32 的 DMA 控制器在不驚動 CPU 的情況下，靜悄悄地將資料即時存入 rx_buffer
+- #### 指標監控 (Main Loop)
+  - 系統持續偵測 `rd_ptr != wr_ptr`，一旦硬體寫入指標變動，立即啟動 Ring Buffer 掃描
+- #### 協定解析與驗證 (Protocol Parser)
+  - **同步 (Sync)**：定位 0xA5 標頭以對齊封包邊界
+  - **校驗 (Integrity)**：計算並驗證 Checksum，確保指令未在傳輸中變質
+  - **轉換 (Endianness)**：處理異構系統通訊， PC (Big-Endian) 與 MCU (Little-Endian) 的位元組序差異
+- #### 指令執行 (Execution)
+  - 封包驗證通過後，觸發斷點或跳轉至 `handle_nvme_read/write` 執行模擬閃存操作
+
+### 核心價值 (Core Engineering Values)
+- #### 數據完整性 (Data Integrity)
+  - 透過 Checksum 演算法保護指令流，模擬真實工業環境中的雜訊處理
+  - 實作 Diagnostic (診斷型) 錯誤回應，主動告知 Host 預期與實際校驗值的差異，極大化除錯效率
+- #### 異構系統通訊與位元組序
+  - 理解跨平台開發中的 Endianness (位元組序) 問題，並在韌體層實作無損轉換
+- #### 硬體資源與效能優化 (Efficiency)
+  - **DMA Ring Buffer**：展示了**生產者-消費者模型**，最大限度減少中斷頻率，釋放 CPU 運算資源
+  - **非阻塞設計**：確保系統在等待資料傳輸時，背景心跳燈仍能正常運作，不產生死機 (Hanging)
+- #### 系統級異常自癒機制 (Hardware Robustness)
+  - **ORE (Overrun Error) 處理**：主動偵測硬體溢位並實作**自動復位 (Reset-and-Sync)**，模擬 SSD 控制器在高負載下的穩定性挑戰
+
+### 測試思維 (Testing Methodology)
+- #### 自動化單元測試 (Unit Testing)
+  - 捨棄手動調試，撰寫 Python 腳本實作一鍵式回歸測試，確保每次修改碼後功能依然正確
+- #### 負向測試 (Negative Testing)
+  - 具備攻擊者思維，透過**錯誤注入**驗證系統在極端情況（非法指令、校驗錯誤、硬體過載）下的行為
+- #### 魯棒性驗證 (Robustness)
+  - 模擬 Host 端產生 Overrun Error 的場景，驗證系統在極度壓力下的恢復能力，這是開發高品質儲存產品的關鍵指標
+
