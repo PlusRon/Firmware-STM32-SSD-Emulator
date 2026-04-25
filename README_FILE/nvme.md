@@ -1,4 +1,13 @@
-# HOST NVMe Protocol
+# 模擬 NVMe 通訊協定規範 (Protocol Specification)
+
+- #### High-Efficiency Data Flow
+  - Implemented **DMA Circular Buffers** and a **Producer-Consumer model** to minimize CPU overhead during 115200 bps UART transmission
+- #### Cross-Platform Data Integrity
+  - **Checksum** verification and handled **Endianness** challenges between PC and STM32
+- #### System Robustness
+  - **UART ORE (Overrun Error) self-healing mechanism** and applied **Defensive Programming** performs input validity checks and limits access length through **QoS** policies to prevent system hanging from malicious inputs
+- #### Automation
+  - Python-based Host Driver(**pySerial**) for **Negative Testing**, **Error Injection** and **automated validation** of the **NVMe read/write** command set
 ## 一、環境建置
 ### 查看 python 版本
 ```
