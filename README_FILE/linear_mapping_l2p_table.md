@@ -1,6 +1,110 @@
 ## 三、程式碼
+### FTL 核心層 `storage.h` 
+```
+#ifndef STORAGE_H
+#define STORAGE_H
 
-### `protocol.h`：通訊協定的規格定義
+#include <stdint.h>
+
+// SSD 規格模擬：16 個物理區塊，每個區塊 32 Byte
+#define TOTAL_BLOCKS   16       
+#define BLOCK_SIZE     32       
+#define INVALID_ADDR   0xFF     // 標記未映射狀態
+
+// 物理區塊節點：用於 Linked List 管理空閒空間 (Free Pool)
+typedef struct BlockNode {
+    uint8_t id;                // 物理區塊 ID (PBA)
+    struct BlockNode* next;    // 指向鏈結串列下一個空閒塊
+} BlockNode_t;
+
+// FTL 核心 API
+void Storage_Init(void);                         // 初始化地圖與空閒鏈表
+void Storage_Write(uint16_t lba, uint8_t* data); // 寫入：包含地圖分配
+void Storage_Read(uint16_t lba, uint8_t* out_buf); // 讀取：包含地圖查找
+
+#endif
+```
+### FTL 核心層 `storage.c`
+```
+#include "storage.h"
+#include "usart.h"
+
+// [物理層模擬]：真正的資料儲存區
+static uint8_t flash_memory[TOTAL_BLOCKS][BLOCK_SIZE];
+
+// [邏輯層映射]：索引是 LBA，值是 PBA (Physical Block Address)
+static uint8_t l2p_table[TOTAL_BLOCKS];
+
+// [空間管理]：Linked List 結構
+static BlockNode_t block_pool[TOTAL_BLOCKS];
+static BlockNode_t* free_list_head = 0;
+
+void Storage_Init(void) {
+    // 1. 初始化 L2P 表，全部設為無效地址
+    for (int i = 0; i < TOTAL_BLOCKS; i++) {
+        l2p_table[i] = INVALID_ADDR;
+    }
+
+    // 2. 初始化空閒鏈表：將所有區塊串接起來
+    for (int i = 0; i < TOTAL_BLOCKS; i++) {
+        block_pool[i].id = i;
+        block_pool[i].next = (i < TOTAL_BLOCKS - 1) ? &block_pool[i+1] : 0;
+    }
+    free_list_head = &block_pool[0];
+    
+    UART_Send(USART1, "[FTL] L2P & Linked List Ready.\r\n");
+}
+
+// 私有函數：從 Linked List 取出一個空閒塊 (Pop)
+static uint8_t allocate_block(void) {
+    if (free_list_head == 0) return INVALID_ADDR;
+    uint8_t id = free_list_head->id;
+    free_list_head = free_list_head->next;
+    return id;
+}
+
+void Storage_Write(uint16_t lba, uint8_t* data) {
+    // 邊界檢查：目前僅支援 16 個 LBA
+    if (lba >= TOTAL_BLOCKS) {
+        UART_Send(USART1, "[ERR] LBA out of range!\r\n");
+        return;
+    }
+
+    // 若該 LBA 尚未映射，則分配一個實體塊
+    if (l2p_table[lba] == INVALID_ADDR) {
+        uint8_t pba = allocate_block();
+        if (pba == INVALID_ADDR) {
+            UART_Send(USART1, "[ERR] DISK FULL (No Free PBA)\r\n");
+            return;
+        }
+        l2p_table[lba] = pba;
+    }
+
+    // 寫入資料到物理位置
+    uint8_t target_pba = l2p_table[lba];
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        flash_memory[target_pba][i] = data[i];
+    }
+    UART_Send(USART1, "[FTL] Write Done.\r\n");
+}
+
+void Storage_Read(uint16_t lba, uint8_t* out_buf) {
+    if (lba >= TOTAL_BLOCKS || l2p_table[lba] == INVALID_ADDR) {
+        UART_Send(USART1, "[ERR] Read Invalid/Unmapped LBA\r\n");
+        // 若未映射，回傳全 0
+        for(int i=0; i<BLOCK_SIZE; i++) out_buf[i] = 0;
+        return;
+    }
+
+    uint8_t pba = l2p_table[lba];
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        out_buf[i] = flash_memory[pba][i];
+    }
+}
+```
+
+
+### 通訊協定層 `protocol.h`：
 ```
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
@@ -31,14 +135,15 @@ void handle_nvme_write(uint16_t lba, uint16_t len); // 處理寫入邏輯
 #endif
 ```
 
-### `protocol.c`：負責模擬 SSD 控制器的 運算層 (Execution Layer)
+### 通訊協定層 `protocol.c`：負責模擬 SSD 控制器的 運算層 (Execution Layer)
 包含指令解析與執行、數據校驗及空間映射
 ```
 #include "protocol.h"
 #include "usart.h"
+#include "storage.h"  // 對接新的儲存層
 
 // 模擬快閃記憶體 (NAND Flash) 的儲存空間，大小為 512 Bytes
-static uint8_t virtual_disk[512];
+// static uint8_t virtual_disk[512];
 
 void Protocol_Parse(uint8_t *packet_buf) {
     // 將輸入緩衝區強制轉換為結構體指針，方便直接透過名稱存取欄位
@@ -57,7 +162,7 @@ void Protocol_Parse(uint8_t *packet_buf) {
         UART_SendChar(USART1, cmd->checksum); // 顯示封包帶來的 CS
         UART_Send(USART1, "\r\n  Expected: 0x");
         UART_SendChar(USART1, calculated_cs); // 顯示 STM32 算出的 CS
-        UART_Send(USART1, ")\r\n");
+        UART_Send(USART1, "\r\n");
         return;　// 放棄該封包，不執行指令
     }
 
@@ -77,22 +182,25 @@ void Protocol_Parse(uint8_t *packet_buf) {
 }
 
 void handle_nvme_read(uint16_t lba, uint16_t len) {
-    // 將長度限制在「虛擬磁碟的大小」以內，防止非法存取
-    // uint16_t safe_len = (len > 512) ? 512 : len;
+    uint8_t read_data[BLOCK_SIZE];
+    Storage_Read(lba, read_data); // 透過 FTL 讀取
 
-    UART_Send(USART1, "[ACK] READ_OK:");
-    // 限制讀取長度，避免非法存取，並循環模擬磁碟空間
-    for (int i = 0; i < (len > 16 ? 16 : len); i++) {
-        UART_SendChar(USART1, virtual_disk[(lba + i) % 512]);
+    UART_Send(USART1, "[ACK] DATA:");
+    // 只回傳前 8 Byte 示意，避免 UART 傳輸過久
+    for (int i = 0; i < 8; i++) {
+        UART_SendChar(USART1, read_data[i]);
     }
     UART_Send(USART1, "\r\n");
 }
 
 void handle_nvme_write(uint16_t lba, uint16_t len) {
-    // 模擬寫入邏輯：將 LBA 地址轉換為資料存入，用於後續讀取驗證
-    for (int i = 0; i < (len > 16 ? 16 : len); i++) {
-        virtual_disk[(lba + i) % 512] = (uint8_t)(lba + i);
+    uint8_t dummy_data[BLOCK_SIZE];
+    // 產生模擬資料：資料內容與 LBA 相關以便驗證
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        dummy_data[i] = (uint8_t)(lba + i);
     }
+    
+    Storage_Write(lba, dummy_data); // 透過 FTL 寫入
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }
 ```
@@ -106,6 +214,7 @@ void handle_nvme_write(uint16_t lba, uint16_t len) {
 #include "dma.h"
 #include "usart.h"
 #include "protocol.h"
+#include "storage.h"
 
 #define RX_BUF_SIZE 1024
 uint8_t rx_buffer[RX_BUF_SIZE];  // 定義 1KB 的接收緩衝區
@@ -127,6 +236,9 @@ void System_Init(void){
     UART_Init(USART1, 69);     // 設定波特率 115200
     *NVIC_ISER = (1UL << 27);  // 開啟中斷向量表中的 UART1 中斷
     SysTick_Init(8000);        // 1ms 系統滴答
+
+    // 初始化 FTL 核心邏輯
+    Storage_Init();
 }
 
 
@@ -183,7 +295,7 @@ int main(void) {
 ```
 
 
-### `host_sender.py`：驗證與自動化測試
+### 驗證與自動化測試 `host_sender.py`
  Host Driver (主機驅動程式) 為驅動模擬腳本，生成各種邊界測試案例，驗證 Device 端的穩定性。負責將抽象的指令封裝為符合規格的二進位流 (Binary Stream)，並透過 Python 實作自動化測試與 **錯誤注入 (Error Injection)** 機制，並透過串口送給 STM32 驗證
 
 ```
@@ -193,7 +305,7 @@ import time    # 負責延時控制
 
 # 定義測試主函式，參數包含：測試名稱、串口物件、指令碼、位址、長度、以及兩個錯誤注入旗標
 def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=False):
-    print(f"\n--- Running: {name} ---")
+    print(f"-> {name} (LBA={lba})", end=': ')
     
     # 模擬錯誤 Opcode 測試 (三元運算)
     actual_op = 0x99 if force_bad_op else opcode
@@ -205,18 +317,19 @@ def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=F
     # 'B' : 1 Byte (unsigned char)，對應 opcode
     # 'H' : 2 Bytes (unsigned short)，對應 lba
     # 'H' : 2 Bytes (unsigned short)，對應 length
-    raw = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
+    # pkt = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
+    pkt = struct.pack('>BBHH', 0xA5, opcode, lba, length)
     
     # # 模擬校驗錯誤測試，計算 Checksum
     if force_bad_cs:
         # 故意將正確的總和 + 1，STM32 收到後算出來會對不起來
-        checksum = (sum(raw) + 1) & 0xFF # 故意讓校驗碼錯誤
+        checksum = (sum(pkt) + 1) & 0xFF # 故意讓校驗碼錯誤
     else:
-        # sum(raw) 會累加前面 6 個 Byte 的數值，& 0xFF 是為了確保它只佔 1 Byte (0-255)
-        checksum = sum(raw) & 0xFF       # 標準計算
+        # sum(pkt) 會累加前面 6 個 Byte 的數值，& 0xFF 是為了確保它只佔 1 Byte (0-255)
+        checksum = sum(pkt) & 0xFF       # 標準計算
         
-    pkt = raw + struct.pack('B', checksum)  # 組合最終 7-byte 封包
-    ser.write(pkt)                          # 透過實體串口送出 # 呼叫底層驅動，將二進位資料經由 USB 傳送到 STM32
+    full_pkt = pkt + struct.pack('B', checksum)  # 組合最終 7-byte 封包
+    ser.write(full_pkt)                          # 透過實體串口送出 # 呼叫底層驅動，將二進位資料經由 USB 傳送到 STM32
     
     time.sleep(0.2)  # 等待 Device 處理回應 # 給 STM32 一點時間運算並回傳訊息
     if ser.in_waiting > 0:
@@ -224,6 +337,8 @@ def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=F
         # decode('ascii') 將二進位轉回文字，errors='ignore' 防止因為亂碼導致程式崩潰
         res = ser.read_all().decode('ascii', errors='ignore').strip()
         print(f"Result: {res}")
+    else:
+        print("No response")
 
 try:
     # 初始化序列埠，115200, N, 8, 1
@@ -234,13 +349,22 @@ try:
 
     # 1. 冒煙測試：基本讀寫功能，成功案例 (Write & Read)
     # 測試 A：正常寫入指令 (LBA 100, 長度 8)
-    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 100, 8)
+    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 5, 8)
 
     # 測試 B：正常讀取指令 (確認剛才寫入的資料)
-    test_nvme("SUCCESSFUL READ",  ser, 0x01, 100, 8)
+    test_nvme("SUCCESSFUL READ",  ser, 0x01, 5, 8)
+
+    # 測試 C: 耗盡空間 (Linked List 壓力測試)
+    # 我們的物理空間只有 16 個區塊
+    print("\n--- Filling SSD ---")
+    for i in range(17):
+        send_nvme(ser, f"Fill-Test-{i}", 0x02, i, 8)
+
+    # 測試 3: 讀取未映射地址
+    send_nvme(ser, "Unmapped Read", 0x01, 99, 8)
 
     # 2. 魯棒性測試：故意傳送 Checksum 錯誤的封包, Checksum 攻擊，測試 STM32 是否會被損壞的封包騙到
-    test_nvme("CHECKSUM ERROR TEST", ser, 0x02, 200, 8, force_bad_cs=True)
+    test_nvme("CHECKSUM ERROR TEST", ser, 0x02, 6, 8, force_bad_cs=True)
 
     # 3. 語義測試：傳送未定義的指令、不支援的指令 (Invalid Opcode),非法指令攻擊，測試 STM32 的邊界檢查是否有效
     test_nvme("INVALID OPCODE TEST", ser, 0x99, 0, 0, force_bad_op=True)
