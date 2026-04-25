@@ -315,20 +315,20 @@ def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=F
     
     # 計算 Checksum
     if force_bad_cs:
-        checksum = (sum(pkt) + 1) & 0xFF
+        checksum = (sum(pkt) + 1) & 0xFF # 故意加 1 造成錯誤
     else:
-        checksum = sum(pkt) & 0xFF
+        checksum = sum(pkt) & 0xFF       # 標準累加校驗
         
-    full_pkt = pkt + struct.pack('B', checksum)
+    full_pkt = pkt + struct.pack('B', checksum)  # 組合為 7 個 Byte
     
     try:
-        ser.write(full_pkt)
+        ser.write(full_pkt)   # 將 7-byte 透過 USB 噴出去
         
         # 增加延時確保 STM32 完成 FTL 操作與 UART 傳輸
-        time.sleep(0.3)
+        time.sleep(0.3)  # 停 300ms。給 STM32 時間處理 FTL 邏輯，避免 Python 讀太快讀不到東西
         
-        if ser.in_waiting > 0:
-            raw_data = ser.read_all()
+        if ser.in_waiting > 0:  # 如果串口緩衝區有回傳資料
+            raw_data = ser.read_all()  # 一次性全部讀取 (Bytes 格式)
             
             # --- 混合解析邏輯 ---
             # 嘗試將原始資料轉為文字觀察
@@ -337,15 +337,15 @@ def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=F
             # 狀況 A: 針對 [ACK] DATA: 的特殊處理 (解決資料看不見的問題)
             if "DATA:" in text_part:
                 # 找出 DATA: 字串的位置，取出後面的二進位部分
-                header_len = raw_data.find(b"DATA:") + 5
-                payload = raw_data[header_len:]
-                print(f"Result: [ACK] DATA: {payload.hex(' ').upper()}")
+                header_len = raw_data.find(b"DATA:") + 5  # 找出 "DATA:" 字串結束的位置
+                payload = raw_data[header_len:]           # 取出後面的 binary 資料
+                print(f"Result: [ACK] DATA: {payload.hex(' ').upper()}")  # 轉成漂亮的 16 進位字串顯示
             
             # 狀況 B: 針對 Checksum Mismatch 的數值處理
             elif "Received: 0x" in text_part:
                 # 重新格式化輸出，將不可見的數值轉為 Hex
                 # 找出 Received: 0x 後面那個 Byte
-                rx_idx = raw_data.find(b"Received: 0x") + 12
+                rx_idx = raw_data.find(b"Received: 0x") + 12  # 定位收到數值的 Byte 位置
                 ex_idx = raw_data.find(b"Expected: 0x") + 12
                 # 確保不越界
                 rx_val = raw_data[rx_idx] if rx_idx < len(raw_data) else 0
@@ -368,40 +368,40 @@ def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=F
 # ========================================
 try:
     # 串口設定 (請確保 Minicom 已關閉)
-    ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-    time.sleep(1) 
-    ser.reset_input_buffer()
+    ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)  # 開啟串口
+    time.sleep(1)   # 硬體連線穩定延時
+    ser.reset_input_buffer()  # 丟棄開機時可能產生的雜訊
 
     print("="*50)
     print("  SSD Simulator Stage 2: FTL & Protocol Integrity Test")
     print("="*50)
 
     # 1. 基本功能測試
-    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 5, 8)
-    test_nvme("SUCCESSFUL READ",  ser, 0x01, 5, 8)
+    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 5, 8)  # 寫入 LBA 5
+    test_nvme("SUCCESSFUL READ",  ser, 0x01, 5, 8)  # 讀回 LBA 5 並檢查資料
 
     # 2. FTL 空間管理測試 (PBA 分配與 LBA 限制)
     print("\n--- Filling SSD (PBA Allocation) ---")
-    for i in range(17):
+    for i in range(17):  # 迴圈寫入 17 次
         # 注意：正確的參數順序是 (name, ser, opcode, lba, length)
-        test_nvme(f"Fill-Test-{i}", ser, 0x02, i, 8)
+        test_nvme(f"Fill-Test-{i}", ser, 0x02, i, 8)  # LBA 0~16
 
     # 3. 邊界與異常測試
     print("\n--- Edge Case Test ---")
-    test_nvme("Read Out of Range", ser, 0x01, 99, 8)
-    test_nvme("Read Unmapped",    ser, 0x01, 30, 8)
+    test_nvme("Read Out of Range", ser, 0x01, 99, 8)  # 測試讀取不存在的 LBA
+    test_nvme("Read Unmapped",    ser, 0x01, 30, 8)   # 測試讀取未映射地址 (應回傳全 0)
 
     # 4. 通訊魯棒性測試
     print("\n--- Protocol Robustness Test ---")
-    test_nvme("CHECKSUM ATTACK",  ser, 0x02, 6, 8, force_bad_cs=True)
-    test_nvme("INVALID OPCODE",   ser, 0x99, 0, 0, force_bad_op=True)
+    test_nvme("CHECKSUM ATTACK",  ser, 0x02, 6, 8, force_bad_cs=True)  # 送壞校驗碼
+    test_nvme("INVALID OPCODE",   ser, 0x99, 0, 0, force_bad_op=True)  # 送壞指令碼
 
     # 5. ORE 硬體溢位壓力測試
     print("\n--- ORE OVERFLOW TEST ---")
     print("-> Sending 2000 bytes garbage to trigger Overrun...")
-    ser.write(b'X' * 2000)
+    ser.write(b'X' * 2000)  # 一次噴 2000 個位元組的垃圾資料
     # 給予較長延時，因為 STM32 需要偵測錯誤、進入主迴圈、執行重置
-    time.sleep(1.0) 
+    time.sleep(1.0)   # 停長一點，讓 STM32 忙完
     if ser.in_waiting > 0:
         res = ser.read_all().decode('ascii', errors='ignore').strip()
         print(f"Result: {res}")
