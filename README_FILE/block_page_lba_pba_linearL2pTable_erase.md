@@ -191,12 +191,12 @@ void Protocol_Parse(uint8_t *packet_buf) {
 }
 
 void Process_Payload(uint8_t *payload_buf) {
-    int res = Storage_Write(current_lba, payload_buf);
-    if (res == 0) UART_Send(USART1, "[ACK] Flash Write Success.\r\n");
-    else if (res == -2) UART_Send(USART1, "[ERR] Disk Full.\r\n");
-    else if (res == -3) UART_Send(USART1, "[ERR] Flash Not Erased.\r\n");
+    StorageStatus_t res = Storage_Write(current_lba, payload_buf);
+    if (res == STORAGE_OK) UART_Send(USART1, "[ACK] Flash Write Success.\r\n");
+    else if (res == STORAGE_ERR_FULL) UART_Send(USART1, "[ERR] Disk Full.\r\n");
+    else if (res == STORAGE_ERR_NOT_ERASED) UART_Send(USART1, "[ERR] Flash Not Erased.\r\n");
     
-    is_waiting_for_payload = 0; // 回到指令模式
+    is_waiting_for_payload = 0; // 必須重置，回到指令模式
 }
 
 void handle_nvme_read(uint16_t lba) {
@@ -219,7 +219,7 @@ void handle_nvme_read(uint16_t lba) {
 #include "usart.h"
 #include "protocol.h"
 #include "storage.h"
-#include "storage.h"
+#include "string.h"
 
 #define RX_BUF_SIZE 1024
 uint8_t rx_buffer[RX_BUF_SIZE];  // 定義 1KB 的接收緩衝區
