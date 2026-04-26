@@ -189,7 +189,7 @@ void Protocol_Parse(uint8_t *packet_buf) {
         UART_Send(USART1, "\r\n  Expected: 0x");
         UART_SendChar(USART1, calculated_cs); // 顯示 STM32 算出的 CS
         UART_Send(USART1, "\r\n");
-        return;　// 放棄該封包，不執行指令
+        return; // 放棄該封包，不執行指令
     }
 
     // 3. 處理位元組序 (Endianness)：使用內建指令將大端序(Host)轉為小端序(STM32)
