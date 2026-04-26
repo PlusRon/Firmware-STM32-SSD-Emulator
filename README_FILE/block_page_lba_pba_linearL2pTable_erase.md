@@ -242,7 +242,17 @@ int main(void) {
             if (is_waiting_for_payload) {
                 // --- 數據模式：等待電腦傳送 64 Byte 的真實數據 ---
                 if (available >= PAYLOAD_SIZE) {
-                    Process_Payload(&rx_buffer[rd_ptr]);
+                    // 檢查數據是否跨越了 Ring Buffer 邊界
+                    if (rd_ptr + PAYLOAD_SIZE <= RX_BUF_SIZE) {
+                        Process_Payload(&rx_buffer[rd_ptr]);
+                    } else {
+                        // 如果跨越邊界，需要搬移到暫存區再處理（或簡化處理）
+                        static uint8_t temp_payload[64];
+                        uint16_t first_part = RX_BUF_SIZE - rd_ptr;
+                        memcpy(temp_payload, &rx_buffer[rd_ptr], first_part);
+                        memcpy(&temp_payload[first_part], rx_buffer, PAYLOAD_SIZE - first_part);
+                        Process_Payload(temp_payload);
+                    }
                     rd_ptr = (rd_ptr + PAYLOAD_SIZE) % RX_BUF_SIZE;
                 }
             } else {
