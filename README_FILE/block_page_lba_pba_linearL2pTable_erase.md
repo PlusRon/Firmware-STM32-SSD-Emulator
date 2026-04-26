@@ -313,70 +313,7 @@ int main(void) {
 }
 ```
 
-```
-#include "stm32f072xb.h"
-#include "gpio.h"
-#include "systick.h"
-#include "dma.h"
-#include "usart.h"
-#include "protocol.h"
-#include "storage.h"
 
-#define RX_BUF_SIZE 1024
-uint8_t rx_buffer[RX_BUF_SIZE];
-uint16_t rd_ptr = 0;
-
-// ... System_Init 保持不變 ...
-
-int main(void) {
-    System_Init();
-    uint32_t last_blink = 0;
-    uint8_t led_state = 0;
-
-    UART_Send(USART1, "\r\n--- NVMe Stage 2.5: Payload State Machine ---\r\n");
-
-    while (1) {
-        uint16_t wr_ptr = DMA_Get_Write_Index(DMA1, 2, RX_BUF_SIZE);
-
-        if (rd_ptr != wr_ptr) {
-            uint16_t available = (wr_ptr >= rd_ptr) ? (wr_ptr - rd_ptr) : (RX_BUF_SIZE - rd_ptr + wr_ptr);
-
-            if (is_waiting_for_payload) {
-                // --- 數據模式：等待電腦傳送 64 Byte 的真實數據 ---
-                if (available >= PAYLOAD_SIZE) {
-                    // 檢查數據是否跨越了 Ring Buffer 邊界
-                    if (rd_ptr + PAYLOAD_SIZE <= RX_BUF_SIZE) {
-                        Process_Payload(&rx_buffer[rd_ptr]);
-                    } else {
-                        // 如果跨越邊界，需要搬移到暫存區再處理（或簡化處理）
-                        static uint8_t temp_payload[64];
-                        uint16_t first_part = RX_BUF_SIZE - rd_ptr;
-                        memcpy(temp_payload, &rx_buffer[rd_ptr], first_part);
-                        memcpy(&temp_payload[first_part], rx_buffer, PAYLOAD_SIZE - first_part);
-                        Process_Payload(temp_payload);
-                    }
-                    rd_ptr = (rd_ptr + PAYLOAD_SIZE) % RX_BUF_SIZE;
-                }
-            } else {
-                // --- 指令模式：等待 7 Byte ---
-                if (available >= PKT_SIZE) {
-                    if (rx_buffer[rd_ptr] == CMD_START_BYTE) {
-                        Protocol_Parse(&rx_buffer[rd_ptr]);
-                        rd_ptr = (rd_ptr + PKT_SIZE) % RX_BUF_SIZE;
-                    } else {
-                        rd_ptr = (rd_ptr + 1) % RX_BUF_SIZE; // 找標頭同步
-                    }
-                }
-            }
-        }
-
-        if ((get_tick() - last_blink) >= 500) {
-            LED_Toggle(GPIOC, 6, &led_state);
-            last_blink = get_tick();
-        }
-    }
-}
-```
 
 
 ### host_sender.py 測試指令修改
