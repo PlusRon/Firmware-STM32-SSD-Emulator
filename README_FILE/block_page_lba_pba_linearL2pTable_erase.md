@@ -183,7 +183,8 @@ void Protocol_Parse(uint8_t *packet_buf) {
     if (cmd->opcode == NVME_OP_WRITE) {
         current_lba = lba;
         is_waiting_for_payload = 1; // 啟動狀態機：下次讀取 32B 數據
-        UART_Send(USART1, "[SYS] WRITE_CMD_ACK. Send 32B Data now.\r\n");
+        // 修正：提示訊息改為 64B，這會讓 Python 的 decode 正常運作
+        UART_Send(USART1, "[SYS] WRITE_CMD_ACK. Send 64B Data now.\r\n");
     } else if (cmd->opcode == NVME_OP_READ) {
         handle_nvme_read(lba);
     }
