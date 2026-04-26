@@ -272,6 +272,141 @@ import serial
 import struct
 import time
 
+# --- 配置參數 ---
+SERIAL_PORT = '/dev/ttyUSB0'  # 請根據你的系統修改 (Windows 可能為 'COM3')
+BAUD_RATE = 115200
+PAGE_SIZE = 64                # 對齊 STM32 的 PAGE_SIZE
+PKT_SIZE = 7                  # 指令包長度
+
+def test_nvme_write(ser, lba, text_data, force_bad_cs=False):
+    """
+    測試寫入功能：包含 7-byte 指令階段與 64-byte 數據階段
+    """
+    name = "WRITE DATA"
+    print(f"-> {name:20} (LBA={lba:<3}, Data='{text_data}')", end=': ')
+    
+    # 1. 建立指令封包 (7 bytes)
+    # 格式: Start(A5), Op(02), LBA(16-bit), Length(16-bit), CS(8-bit)
+    pkt = struct.pack('>BBHH', 0xA5, 0x02, lba, PAGE_SIZE)
+    
+    if force_bad_cs:
+        checksum = (sum(pkt) + 1) & 0xFF
+    else:
+        checksum = sum(pkt) & 0xFF
+    
+    full_cmd = pkt + struct.pack('B', checksum)
+    
+    try:
+        # 發送指令
+        ser.write(full_cmd)
+        time.sleep(0.1) # 給 STM32 進入 is_waiting_for_payload 狀態的時間
+        
+        # 發送 64-byte 數據
+        payload = text_data.encode('ascii').ljust(PAGE_SIZE, b'\x00')
+        ser.write(payload)
+        
+        time.sleep(0.3) # 等待 FTL 處理
+        
+        if ser.in_waiting > 0:
+            res = ser.read_all().decode('ascii', errors='ignore').strip()
+            print(f"Result: {res}")
+        else:
+            print("Result: [No Response]")
+            
+    except Exception as e:
+        print(f"Result: [Exception] {e}")
+
+def test_nvme_read(ser, lba):
+    """
+    測試讀取功能：發送 7-byte 指令並解析回傳的 64-byte 二進位資料
+    """
+    name = "READ DATA"
+    print(f"-> {name:20} (LBA={lba:<3})", end=': ')
+    
+    # 建立指令封包 (Op=01 為 Read)
+    pkt = struct.pack('>BBHH', 0xA5, 0x01, lba, PAGE_SIZE)
+    checksum = sum(pkt) & 0xFF
+    full_cmd = pkt + struct.pack('B', checksum)
+    
+    try:
+        ser.write(full_cmd)
+        time.sleep(0.3)
+        
+        if ser.in_waiting > 0:
+            raw_data = ser.read_all()
+            text_part = raw_data.decode('ascii', errors='ignore').strip()
+            
+            # 解析邏輯
+            if b"DATA:" in raw_data:
+                idx = raw_data.find(b"DATA:") + 5
+                payload = raw_data[idx:idx+PAGE_SIZE]
+                hex_str = payload.hex(' ').upper()
+                ascii_str = payload.decode('ascii', errors='ignore').replace('\0', '.')
+                print(f"Result: [ACK] DATA: {hex_str} | Text: {ascii_str}")
+            else:
+                print(f"Result: {text_part}")
+        else:
+            print("Result: [No Response]")
+            
+    except Exception as e:
+        print(f"Result: [Exception] {e}")
+
+# ========================================
+# 主測試流程
+# ========================================
+if __name__ == "__main__":
+    try:
+        # 初始化串口
+        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+        time.sleep(1) # 等待硬體穩定
+        ser.reset_input_buffer()
+        
+        print("="*70)
+        print("  STM32F072 SSD Simulator Stage 2.5: 64B Page FTL Test")
+        print("="*70)
+
+        # 1. 功能測試：寫入與讀回
+        print("\n--- Basic Functional Test ---")
+        test_nvme_write(ser, 7, "Hello STM32")
+        test_nvme_read(ser, 7)
+        
+        test_nvme_write(ser, 10, "Embedded Systems")
+        test_nvme_read(ser, 10)
+
+        # 2. FTL 異地更新測試 (覆寫同一個 LBA)
+        print("\n--- Out-of-place Write Test ---")
+        test_nvme_write(ser, 7, "New Data") # 寫入 LBA 7，舊的 PBA 應變 DIRTY
+        test_nvme_read(ser, 7)
+
+        # 3. 異常測試
+        print("\n--- Error Handling Test ---")
+        # 故意送錯誤的 Checksum
+        test_nvme_write(ser, 5, "Bad CS Data", force_bad_cs=True)
+        
+        # 讀取從未寫入過的 LBA (應該回傳全 0 或特定訊息)
+        test_nvme_read(ser, 50)
+
+        # 4. 壓力測試：大量寫入直到空間滿
+        print("\n--- Capacity Test (Filling up to LBA 63) ---")
+        test_nvme_write(ser, 63, "Last LBA Data")
+        test_nvme_read(ser, 63)
+
+        print("\n" + "="*70)
+        print("  All Tests Completed Successfully")
+        print("="*70)
+        
+        ser.close()
+
+    except Exception as e:
+        print(f"\n[FATAL ERROR]: {e}")
+```
+
+### old
+```
+import serial
+import struct
+import time
+
 def test_write_with_data(ser, lba, text_data):
     print(f"-> Writing to LBA {lba}: '{text_data}'")
     
