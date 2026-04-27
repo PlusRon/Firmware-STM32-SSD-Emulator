@@ -323,122 +323,146 @@ import serial
 import struct
 import time
 import random
+from datetime import datetime
 
-# --- 配置區域 ---
-PORT = '/dev/ttyUSB0'  # Windows 使用者請改為 'COMx'
+# --- ANSI 顏色配置 ---
+class Color:
+    PURPLE = '\033[95m'
+    BLUE   = '\033[94m'
+    CYAN   = '\033[96m'
+    GREEN  = '\033[92m'
+    YELLOW = '\033[93m'
+    RED    = '\033[91m'
+    END    = '\033[0m'
+    BOLD   = '\033[1m'
+    GRAY   = '\033[90m'
+
+# --- 測試配置 ---
+PORT = '/dev/ttyUSB0' 
 BAUD = 115200
+USER_CAPACITY = 64
 PAGE_SIZE = 64
-USER_CAPACITY = 64     # 50% OP: 使用者可用 LBA (0-63)
-TOTAL_PHYSICAL = 128   # 實際物理上限
 
-def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=False):
-    """
-    核心測試函式：支援二進位資料混合解析與異常注入
-    """
-    display_name = f"{name} (LBA={lba})"
-    print(f"-> {display_name:35}", end=': ')
-    
-    # 1. 建立 7-byte 封包
-    actual_op = 0x99 if force_bad_op else opcode
-    pkt = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
-    
-    # 2. 校驗碼處理
-    if force_bad_cs:
-        checksum = (sum(pkt) + 1) & 0xFF
-    else:
-        checksum = sum(pkt) & 0xFF
+class FTLUnitTester:
+    def __init__(self):
+        try:
+            self.ser = serial.Serial(PORT, BAUD, timeout=0.1)
+            time.sleep(1)
+            self.ser.reset_input_buffer()
+            self.stats = {"pass": 0, "fail": 0, "total": 0}
+        except Exception as e:
+            print(f"{Color.RED}[FATAL]{Color.END} Serial Error: {e}")
+            exit(1)
+
+    def _format_hex(self, data):
+        return data.hex(' ').upper() if data else "NONE"
+
+    def _send_cmd(self, op, lba, length, bad_cs=False):
+        pkt = struct.pack('>BBHH', 0xA5, op, lba, length)
+        cs = (sum(pkt) + (1 if bad_cs else 0)) & 0xFF
+        full_pkt = pkt + struct.pack('B', cs)
+        self.ser.write(full_pkt)
+        return full_pkt
+
+    def _receive_resp(self, expected_data=False):
+        raw = b""
+        start_time = time.time()
+        while (time.time() - start_time) < 0.6: # 增加到 600ms 確保長資料完整
+            if self.ser.in_waiting > 0:
+                raw += self.ser.read(self.ser.in_waiting)
+                if expected_data and b"DATA:" in raw:
+                    if len(raw.split(b"DATA:")[1]) >= PAGE_SIZE: break
+                elif not expected_data and len(raw) > 5: break
+            time.sleep(0.01)
+
+        text = raw.decode('ascii', errors='ignore').strip()
+        data_payload = None
+        if b"DATA:" in raw:
+            idx = raw.find(b"DATA:") + 5
+            data_payload = raw[idx : idx + PAGE_SIZE]
+        return raw, text, data_payload
+
+    def run_unit(self, tag, name, op, lba, length=PAGE_SIZE, expect="ACK", check_content=False, bad_cs=False, bad_op=False):
+        self.stats["total"] += 1
+        opcode = 0x99 if bad_op else op
         
-    full_pkt = pkt + struct.pack('B', checksum)
-    
-    try:
-        ser.write(full_pkt)
-        time.sleep(0.15)  # 給予 STM32 處理 FTL 與回傳的時間
+        tx_raw = self._send_cmd(opcode, lba, length, bad_cs)
+        rx_raw, rx_text, rx_data = self._receive_resp(expected_data=check_content)
         
-        if ser.in_waiting > 0:
-            raw_data = ser.read_all()
-            text_part = raw_data.decode('ascii', errors='ignore').strip()
-            
-            # 狀況 A: 處理 DATA 回傳 (轉 Hex 顯示)
-            if b"DATA:" in raw_data:
-                header_idx = raw_data.find(b"DATA:") + 5
-                payload = raw_data[header_idx:]
-                print(f"Result: [ACK] DATA: {payload[:8].hex(' ').upper()}...")
-            
-            # 狀況 B: 處理詳細校驗錯誤資訊
-            elif "Received: 0x" in text_part:
-                print(f"Result: [ERR] Checksum Mismatch! ({text_part})")
-                
-            # 狀況 C: 一般文字資訊 (OK, Out of Range, etc.)
-            else:
-                clean_text = "".join(ch for ch in text_part if ch.isprintable() or ch in "\r\n")
-                print(f"Result: {clean_text.strip()}")
-        else:
-            print("Result: [Timeout] No response")
-            
-    except Exception as e:
-        print(f"Result: [Exception] {e}")
+        # 邏輯判定
+        is_pass = False
+        if expect in rx_text:
+            is_pass = True
+        elif check_content and rx_data and rx_data[0] == lba:
+            is_pass = True
+        
+        # 視覺化輸出
+        status_str = f"{Color.GREEN}PASS{Color.END}" if is_pass else f"{Color.RED}FAIL{Color.END}"
+        # 嚴格對齊排版：Tag(8), Name(32), LBA(8), Status
+        print(f"[{Color.BLUE}{tag:6}{Color.END}] {name:32} | LBA:{lba:<3} | [{status_str}]")
 
-# ========================================
-# 主測試流程
-# ========================================
-try:
-    ser = serial.Serial(PORT, BAUD, timeout=1)
-    time.sleep(1.5)
-    ser.reset_input_buffer()
+        # 輸出詳細 Data (僅讀取測試)
+        if rx_data and is_pass:
+            print(f"       {Color.GRAY}└─ DATA: {rx_data[:16].hex(' ').upper()} ... (64B){Color.END}")
+        
+        # 輸出錯誤訊息或異常 Raw (僅 EDGE/PROT/RECO 或 FAIL 時)
+        if tag in ["EDGE", "PROT", "RECO"] or not is_pass:
+            if rx_text: print(f"       {Color.CYAN}└─ MSG: \"{rx_text}\"{Color.END}")
+            print(f"       {Color.GRAY}└─ RAW: [{self._format_hex(rx_raw)}]{Color.END}")
 
-    print("="*70)
-    print(f"{'STM32 FTL 50% OP & Protocol Integrity Perfect Test':^70}")
-    print(f"{'User LBA Range: 0 - 63 (Total 64 Pages)':^70}")
-    print("="*70)
+        if is_pass: self.stats["pass"] += 1
+        else: self.stats["fail"] += 1
 
-    # 1. 基本功能測試 (Write then Read)
-    print("\n[STEP 1] Basic Functionality Test")
-    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 10, PAGE_SIZE)
-    test_nvme("SUCCESSFUL READ",  ser, 0x01, 10, PAGE_SIZE)
+    def header(self, title):
+        print(f"\n{Color.BOLD}{Color.PURPLE}== {title} =={Color.END}")
+        print(f"{Color.GRAY}{'-'*75}{Color.END}")
 
-    # 2. 全盤空間管理測試 (50% 容量填充)
-    print("\n[STEP 2] User Space Pressure Fill (0-63)")
+# --- 測試執行流 ---
+if __name__ == "__main__":
+    t = FTLUnitTester()
+    print(f"\n{Color.YELLOW}{Color.BOLD}STM32 FTL Logic & Protocol Unit Testing Suite v3.0{Color.END}")
+    print(f"Config: {PORT} @ {BAUD} | Target: 11th Grade IT Vocational Lab")
+
+    # STEP 1: 基本功能
+    t.header("STEP 1: Basic Functionality (CRUD)")
+    t.run_unit("IO", "Single Page Write", 0x02, 10)
+    t.run_unit("IO", "Single Page Read & Verify", 0x01, 10, check_content=True)
+
+    # STEP 2: 壓力測試 (自動填充)
+    t.header("STEP 2: Address Space Pressure Fill")
+    print(f" {Color.GRAY}-> Filling Range 0-63...{Color.END}")
     for i in range(USER_CAPACITY):
-        # 每 16 筆才印一次，避免洗屏，最後一筆必印
-        if i % 16 == 0 or i == USER_CAPACITY - 1:
-            test_nvme(f"Fill Progress {i+1}/{USER_CAPACITY}", ser, 0x02, i, PAGE_SIZE)
-        else:
-            # 靜默發送
-            pkt = struct.pack('>BBHH', 0xA5, 0x02, i, PAGE_SIZE)
-            ser.write(pkt + struct.pack('B', sum(pkt) & 0xFF))
-            time.sleep(0.02)
+        t._send_cmd(0x02, i, PAGE_SIZE)
+        if i % 20 == 0: print(f"    Progress: {i}/{USER_CAPACITY}")
+        time.sleep(0.01)
+    t.run_unit("FILL", "Full Range Integrity Check", 0x01, 63, check_content=True)
 
-    # 3. 邊界與異常測試
-    print("\n[STEP 3] Boundary & Error Injection")
-    test_nvme("OUT OF RANGE TEST", ser, 0x02, USER_CAPACITY, PAGE_SIZE) # 測試 LBA 64
-    test_nvme("UNMAPPED LBA READ", ser, 0x01, 50, PAGE_SIZE)           # 假設 LBA 50 未寫入
-    test_nvme("CHECKSUM ATTACK",   ser, 0x02, 5, PAGE_SIZE, force_bad_cs=True)
-    test_nvme("INVALID OPCODE",    ser, 0x99, 0, 0, force_bad_op=True)
+    # STEP 3: 邊界與異常 (補齊單元測試項目)
+    t.header("STEP 3: Boundary & Error Injection")
+    t.run_unit("EDGE", "LBA Out of Range Test", 0x02, 64, expect="ERR")
+    t.run_unit("IO",   "Unmapped LBA Read Test", 0x01, 50, check_content=True) # 補齊此項
+    t.run_unit("PROT", "Protocol Checksum Attack", 0x02, 5, bad_cs=True, expect="CS")
+    t.run_unit("PROT", "Invalid Opcode Handling", 0x02, 0, bad_op=True, expect="OP")
 
-    # 4. 隨機存取抽查
-    print("\n[STEP 4] Random Access Integrity Check")
-    for _ in range(5):
-        target = random.randint(0, USER_CAPACITY - 1)
-        test_nvme("RANDOM VERIFY", ser, 0x01, target, PAGE_SIZE)
+    # STEP 4: 隨機讀寫驗證
+    t.header("STEP 4: Random Access Verification")
+    for s in sorted(random.sample(range(USER_CAPACITY), 4)):
+        t.run_unit("RAND", f"Random Consistency Check", 0x01, s, check_content=True)
 
-    # 5. ORE 硬體溢位壓力測試
-    print("\n[STEP 5] ORE OVERFLOW & RECOVERY TEST")
-    print("-> Sending 2000 bytes garbage to trigger Overrun...")
-    ser.write(b'X' * 2000)
-    time.sleep(1.2)  # 等待 MCU 重置 DMA
-    if ser.in_waiting > 0:
-        res = ser.read_all().decode('ascii', errors='ignore').strip()
-        print(f"-> MCU Recovery Signal: {res}")
-    else:
-        print("-> Result: No response (System might be hung)")
+    # STEP 5: 系統韌性
+    t.header("STEP 5: System Resilience (Hardware ORE)")
+    print(f" {Color.GRAY}-> Triggering 2000-byte UART Overrun...{Color.END}")
+    t.ser.write(b'\xFF' * 2000)
+    time.sleep(1.2)
+    t.run_unit("RECO", "Post-Overrun Auto-Recovery", 0x01, 10, expect="ORE")
 
-    ser.close()
-    print("\n" + "="*70)
-    print(f"{'All Tests Completed Successfully':^70}")
-    print("="*70)
-
-except Exception as e:
-    print(f"\n[FATAL ERROR]: {e}")
+    # 總結
+    print(f"\n{Color.BOLD}{'='*75}{Color.END}")
+    print(f"  {Color.BOLD}UNIT TEST RESULT - {datetime.now().strftime('%H:%M:%S')}{Color.END}")
+    print(f"  Total: {t.stats['total']} | Passed: {Color.GREEN}{t.stats['pass']}{Color.END} | Failed: {Color.RED}{t.stats['fail']}{Color.END}")
+    print(f"  Score: {(t.stats['pass']/t.stats['total'])*100:.1f}%")
+    print(f"{Color.BOLD}{'='*75}{Color.END}\n")
+    t.ser.close()
 ```
 
 ## SSD physical BLOCK/PAGE
