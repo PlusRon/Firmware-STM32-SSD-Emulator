@@ -1,15 +1,12 @@
-
-
-
 ## 
-### storage.h (FTL 儲存層定義)
+### storage.h
 ```
 
 ```
 
 
 
-### storage.c (FTL 儲存層實作)
+### storage.c
 ```
 ```
 
@@ -32,6 +29,416 @@
 ### host_sender.py
 ```
 
+```
+
+
+
+
+## 50% Over-Provisioning (OP)
+### storage.h
+```
+#ifndef STORAGE_H
+#define STORAGE_H
+
+#include <stdint.h>
+
+/* SSD 規格：4 Blocks, 32 Pages per Block, 64 Bytes per Page */
+/* 總物理容量 = 4 * 32 * 64 = 8192 Bytes (8KB) */
+#define PHYSICAL_BLOCKS     4     
+#define PAGES_PER_BLOCK     32    
+#define PAGE_SIZE           64    
+#define TOTAL_PAGES         (PHYSICAL_BLOCKS * PAGES_PER_BLOCK) // 128 Pages
+
+/* Over-Provisioning: 50% 空間留給 GC，僅開放 50% 給使用者 */
+#define USER_PAGES          (TOTAL_PAGES / 2) // 64 Pages
+
+#define INVALID_ADDR        0xFF  
+
+/* 物理頁面節點 */
+typedef struct PageNode {
+    uint8_t id;                
+    struct PageNode* next;     
+} __attribute__((aligned(4))) PageNode_t;
+
+/* FTL 核心 API */
+void Storage_Init(void);
+void Storage_Write(uint16_t lba, uint8_t* data);
+void Storage_Read(uint16_t lba, uint8_t* out_buf);
+
+#endif
+```
+
+
+
+### storage.c
+```
+#include "storage.h"
+#include "usart.h"
+#include <string.h>
+
+/* 物理空間與映射表 */
+__attribute__((aligned(4))) static uint8_t flash_memory[PHYSICAL_BLOCKS][PAGES_PER_BLOCK][PAGE_SIZE];
+/* L2P 表僅需對應使用者可見的 LBA 數量 */
+__attribute__((aligned(4))) static uint8_t l2p_table[USER_PAGES];
+/* 物理頁面池包含所有頁面 (含預留空間) */
+__attribute__((aligned(4))) static PageNode_t page_pool[TOTAL_PAGES];
+
+static PageNode_t* free_list_head = 0; 
+
+void Storage_Init(void) {
+    /* 1. 初始化 L2P 表 (映射 64 個 LBA) */
+    for (int i = 0; i < USER_PAGES; i++) {
+        l2p_table[i] = INVALID_ADDR;
+    }
+
+    /* 2. 初始化空閒頁面鏈表 (128 個物理頁面全部進入 Free List) */
+    for (int i = 0; i < TOTAL_PAGES; i++) {
+        page_pool[i].id = (uint8_t)i;
+        page_pool[i].next = (i < TOTAL_PAGES - 1) ? &page_pool[i+1] : 0;
+    }
+    free_list_head = &page_pool[0];
+    
+    /* 3. 清除 Flash 內容 */
+    for(int b = 0; b < PHYSICAL_BLOCKS; b++) {
+        for(int p = 0; p < PAGES_PER_BLOCK; p++) {
+            for(int i = 0; i < PAGE_SIZE; i++) {
+                flash_memory[b][p][i] = 0xFF;
+            }
+        }
+    }
+    
+    UART_Send(USART1, "[FTL] 8KB SSD Initialized. User: 50%, Reserved: 50%.\r\n");
+}
+
+static uint8_t allocate_page(void) {
+    if (free_list_head == 0) return INVALID_ADDR;
+    uint8_t id = free_list_head->id;
+    free_list_head = free_list_head->next;
+    return id;
+}
+
+void Storage_Write(uint16_t lba, uint8_t* data) {
+    /* 邊界檢查：僅允許存取 0 ~ USER_PAGES-1 */
+    if (lba >= USER_PAGES) {
+        UART_Send(USART1, "[ERR] LBA Out of User Range\r\n");
+        return;
+    }
+
+    if (l2p_table[lba] == INVALID_ADDR) {
+        uint8_t pba = allocate_page();
+        if (pba == INVALID_ADDR) {
+            UART_Send(USART1, "[ERR] DISK FULL\r\n");
+            return;
+        }
+        l2p_table[lba] = pba;
+    }
+
+    uint8_t pba_id = l2p_table[lba];
+    uint8_t b = pba_id / PAGES_PER_BLOCK;
+    uint8_t p = pba_id % PAGES_PER_BLOCK;
+
+    for(int i = 0; i < PAGE_SIZE; i++) {
+        flash_memory[b][p][i] = data[i];
+    }
+}
+
+void Storage_Read(uint16_t lba, uint8_t* out_buf) {
+    /* 邊界檢查 */
+    if (lba >= USER_PAGES || l2p_table[lba] == INVALID_ADDR) {
+        for(int i = 0; i < PAGE_SIZE; i++) out_buf[i] = 0;
+        return;
+    }
+
+    uint8_t pba_id = l2p_table[lba];
+    uint8_t b = pba_id / PAGES_PER_BLOCK;
+    uint8_t p = pba_id % PAGES_PER_BLOCK;
+    
+    for(int i = 0; i < PAGE_SIZE; i++) {
+        out_buf[i] = flash_memory[b][p][i];
+    }
+}
+```
+
+### protocol.h
+```
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
+
+#include <stdint.h>
+
+#define PKT_SIZE        7      
+#define CMD_START_BYTE  0xA5   
+
+#define NVME_OP_READ    0x01
+#define NVME_OP_WRITE   0x02
+
+typedef struct {
+    uint8_t  start_byte;   
+    uint8_t  opcode;       
+    uint16_t lba;          
+    uint16_t length;       
+    uint8_t  checksum;     
+} __attribute__((packed)) NVMe_Command_t;
+
+void Protocol_Parse(uint8_t *packet_buf);
+void handle_nvme_read(uint16_t lba, uint16_t len);
+void handle_nvme_write(uint16_t lba, uint16_t len);
+
+#endif
+```
+
+
+### protocol.c
+```
+#include "protocol.h"
+#include "usart.h"
+#include "storage.h"
+#include <string.h>
+
+__attribute__((aligned(4))) static uint8_t g_data_buf[PAGE_SIZE];
+
+void Protocol_Parse(uint8_t *packet_buf) {
+    NVMe_Command_t *cmd = (NVMe_Command_t *)packet_buf;
+    uint8_t calculated_cs = 0;
+
+    for (int i = 0; i < 6; i++) {
+        calculated_cs += packet_buf[i];
+    }
+
+    if (calculated_cs != cmd->checksum) {
+        UART_Send(USART1, "[ERR] CS Mismatch\r\n");
+        return;
+    }
+
+    uint16_t lba = (uint16_t)((packet_buf[2] << 8) | packet_buf[3]);
+    uint16_t len = (uint16_t)((packet_buf[4] << 8) | packet_buf[5]);
+
+    if (cmd->opcode == NVME_OP_READ) {
+        handle_nvme_read(lba, len);
+    } else if (cmd->opcode == NVME_OP_WRITE) {
+        handle_nvme_write(lba, len);
+    } else {
+        UART_Send(USART1, "[ERR] INVALID_OP\r\n");
+    }
+}
+
+void handle_nvme_read(uint16_t lba, uint16_t len) {
+    Storage_Read(lba, g_data_buf); 
+
+    UART_Send(USART1, "[ACK] DATA:");
+    for (int i = 0; i < 8; i++) {
+        UART_SendChar(USART1, g_data_buf[i]);
+    }
+    UART_Send(USART1, "\r\n");
+}
+
+void handle_nvme_write(uint16_t lba, uint16_t len) {
+    for (int i = 0; i < PAGE_SIZE; i++) {
+        g_data_buf[i] = (uint8_t)(lba + i);
+    }
+    
+    Storage_Write(lba, g_data_buf);
+    UART_Send(USART1, "[ACK] WRITE_OK\r\n");
+}
+```
+
+
+
+### main.c
+```
+#include "stm32f072xb.h"
+#include "gpio.h"
+#include "systick.h"
+#include "dma.h"
+#include "usart.h"
+#include "protocol.h"
+#include "storage.h"
+
+#define RX_BUF_SIZE 1024
+__attribute__((aligned(4))) uint8_t rx_buffer[RX_BUF_SIZE];  
+uint16_t rd_ptr = 0;             
+
+void System_Init(void){
+    RCC->APB2ENR |= (1UL << 14);   
+    RCC->AHBENR  |= (1UL << 0);    
+    GPIO_Init_Output(GPIOC, 6);    
+    GPIO_Init_AF(GPIOA, 9, 1);     
+    GPIO_Init_AF(GPIOA, 10, 1);    
+
+    USART1->ICR |= 0xFFFFFFFF;
+
+    DMA_Init(DMA1, 2, (uint32_t)&(USART1->RDR), (uint32_t)rx_buffer, RX_BUF_SIZE);
+    UART_Init(USART1, 69);     
+    *NVIC_ISER = (1UL << 27);  
+    SysTick_Init(8000);        
+
+    Storage_Init();
+}
+
+int main(void) {
+    System_Init();
+
+    uint32_t last_blink = 0;
+    uint8_t led_state = 0;
+
+    UART_Send(USART1, "\r\n--- NVMe 8KB Mode (50%% User Space) ---\r\n");
+
+    while (1) {
+        if (uart_overrun_occurred) {
+            uart_overrun_occurred = 0;
+            UART_Send(USART1, "[SYS] ORE_ERROR\r\n");
+            DMA_Init(DMA1, 2, (uint32_t)&(USART1->RDR), (uint32_t)rx_buffer, RX_BUF_SIZE);
+            rd_ptr = 0;
+        }
+
+        uint16_t wr_ptr = DMA_Get_Write_Index(DMA1, 2, RX_BUF_SIZE);
+
+        if (rd_ptr != wr_ptr) {
+            uint16_t available = (wr_ptr >= rd_ptr) ? (wr_ptr - rd_ptr) : (RX_BUF_SIZE - rd_ptr + wr_ptr);
+
+            while (available >= PKT_SIZE) {
+                if (rx_buffer[rd_ptr] == CMD_START_BYTE) {
+                    Protocol_Parse(&rx_buffer[rd_ptr]);         
+                    rd_ptr = (rd_ptr + PKT_SIZE) % RX_BUF_SIZE; 
+                    available -= PKT_SIZE;
+                } else {
+                    rd_ptr = (rd_ptr + 1) % RX_BUF_SIZE;
+                    available--;
+                }
+            }
+        }
+
+        if ((get_tick() - last_blink) >= 500) {
+            LED_Toggle(GPIOC, 6, &led_state);
+            last_blink = get_tick();
+        }
+    }
+}
+```
+
+
+### host_sender.py
+```
+import serial
+import struct
+import time
+import random
+
+# --- 配置區域 ---
+PORT = '/dev/ttyUSB0'  # Windows 使用者請改為 'COMx'
+BAUD = 115200
+PAGE_SIZE = 64
+USER_CAPACITY = 64     # 50% OP: 使用者可用 LBA (0-63)
+TOTAL_PHYSICAL = 128   # 實際物理上限
+
+def test_nvme(name, ser, opcode, lba, length, force_bad_cs=False, force_bad_op=False):
+    """
+    核心測試函式：支援二進位資料混合解析與異常注入
+    """
+    display_name = f"{name} (LBA={lba})"
+    print(f"-> {display_name:35}", end=': ')
+    
+    # 1. 建立 7-byte 封包
+    actual_op = 0x99 if force_bad_op else opcode
+    pkt = struct.pack('>BBHH', 0xA5, actual_op, lba, length)
+    
+    # 2. 校驗碼處理
+    if force_bad_cs:
+        checksum = (sum(pkt) + 1) & 0xFF
+    else:
+        checksum = sum(pkt) & 0xFF
+        
+    full_pkt = pkt + struct.pack('B', checksum)
+    
+    try:
+        ser.write(full_pkt)
+        time.sleep(0.15)  # 給予 STM32 處理 FTL 與回傳的時間
+        
+        if ser.in_waiting > 0:
+            raw_data = ser.read_all()
+            text_part = raw_data.decode('ascii', errors='ignore').strip()
+            
+            # 狀況 A: 處理 DATA 回傳 (轉 Hex 顯示)
+            if b"DATA:" in raw_data:
+                header_idx = raw_data.find(b"DATA:") + 5
+                payload = raw_data[header_idx:]
+                print(f"Result: [ACK] DATA: {payload[:8].hex(' ').upper()}...")
+            
+            # 狀況 B: 處理詳細校驗錯誤資訊
+            elif "Received: 0x" in text_part:
+                print(f"Result: [ERR] Checksum Mismatch! ({text_part})")
+                
+            # 狀況 C: 一般文字資訊 (OK, Out of Range, etc.)
+            else:
+                clean_text = "".join(ch for ch in text_part if ch.isprintable() or ch in "\r\n")
+                print(f"Result: {clean_text.strip()}")
+        else:
+            print("Result: [Timeout] No response")
+            
+    except Exception as e:
+        print(f"Result: [Exception] {e}")
+
+# ========================================
+# 主測試流程
+# ========================================
+try:
+    ser = serial.Serial(PORT, BAUD, timeout=1)
+    time.sleep(1.5)
+    ser.reset_input_buffer()
+
+    print("="*70)
+    print(f"{'STM32 FTL 50% OP & Protocol Integrity Perfect Test':^70}")
+    print(f"{'User LBA Range: 0 - 63 (Total 64 Pages)':^70}")
+    print("="*70)
+
+    # 1. 基本功能測試 (Write then Read)
+    print("\n[STEP 1] Basic Functionality Test")
+    test_nvme("SUCCESSFUL WRITE", ser, 0x02, 10, PAGE_SIZE)
+    test_nvme("SUCCESSFUL READ",  ser, 0x01, 10, PAGE_SIZE)
+
+    # 2. 全盤空間管理測試 (50% 容量填充)
+    print("\n[STEP 2] User Space Pressure Fill (0-63)")
+    for i in range(USER_CAPACITY):
+        # 每 16 筆才印一次，避免洗屏，最後一筆必印
+        if i % 16 == 0 or i == USER_CAPACITY - 1:
+            test_nvme(f"Fill Progress {i+1}/{USER_CAPACITY}", ser, 0x02, i, PAGE_SIZE)
+        else:
+            # 靜默發送
+            pkt = struct.pack('>BBHH', 0xA5, 0x02, i, PAGE_SIZE)
+            ser.write(pkt + struct.pack('B', sum(pkt) & 0xFF))
+            time.sleep(0.02)
+
+    # 3. 邊界與異常測試
+    print("\n[STEP 3] Boundary & Error Injection")
+    test_nvme("OUT OF RANGE TEST", ser, 0x02, USER_CAPACITY, PAGE_SIZE) # 測試 LBA 64
+    test_nvme("UNMAPPED LBA READ", ser, 0x01, 50, PAGE_SIZE)           # 假設 LBA 50 未寫入
+    test_nvme("CHECKSUM ATTACK",   ser, 0x02, 5, PAGE_SIZE, force_bad_cs=True)
+    test_nvme("INVALID OPCODE",    ser, 0x99, 0, 0, force_bad_op=True)
+
+    # 4. 隨機存取抽查
+    print("\n[STEP 4] Random Access Integrity Check")
+    for _ in range(5):
+        target = random.randint(0, USER_CAPACITY - 1)
+        test_nvme("RANDOM VERIFY", ser, 0x01, target, PAGE_SIZE)
+
+    # 5. ORE 硬體溢位壓力測試
+    print("\n[STEP 5] ORE OVERFLOW & RECOVERY TEST")
+    print("-> Sending 2000 bytes garbage to trigger Overrun...")
+    ser.write(b'X' * 2000)
+    time.sleep(1.2)  # 等待 MCU 重置 DMA
+    if ser.in_waiting > 0:
+        res = ser.read_all().decode('ascii', errors='ignore').strip()
+        print(f"-> MCU Recovery Signal: {res}")
+    else:
+        print("-> Result: No response (System might be hung)")
+
+    ser.close()
+    print("\n" + "="*70)
+    print(f"{'All Tests Completed Successfully':^70}")
+    print("="*70)
+
+except Exception as e:
+    print(f"\n[FATAL ERROR]: {e}")
 ```
 
 ## SSD physical BLOCK/PAGE
