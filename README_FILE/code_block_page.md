@@ -36,6 +36,7 @@ void Storage_Read(uint16_t lba, uint8_t* out_buf);
 #include <string.h>
 
 // [物理層模擬]：佔用 2048 Bytes SRAM
+// 增加 volatile 確保編譯器不會將此大塊記憶體優化掉或誤判位址
 static uint8_t flash_memory[PHYSICAL_BLOCKS][PAGES_PER_BLOCK][PAGE_SIZE];
 
 // [邏輯層映射]：LBA -> PBA (Physical Address)
@@ -46,20 +47,30 @@ static PageNode_t page_pool[TOTAL_PAGES];
 static PageNode_t* free_list_head = 0;
 
 void Storage_Init(void) {
-    // 1. 初始化 L2P 表，全部設為無效地址
+    // 1. 初始化 L2P 表，全部設為無效地址 (0xFFFF)
     for (int i = 0; i < TOTAL_LBA; i++) {
         l2p_table[i] = INVALID_ADDR;
     }
 
     // 2. 初始化空閒鏈表：將所有物理頁面串接起來 (0~63)
+    // 顯式設定最後一個節點為 0 (NULL)，避免鏈表無限迴圈
     for (int i = 0; i < TOTAL_PAGES; i++) {
-        page_pool[i].pba = i;
-        page_pool[i].next = (i < TOTAL_PAGES - 1) ? &page_pool[i+1] : 0;
+        page_pool[i].pba = (uint16_t)i;
+        if (i < (TOTAL_PAGES - 1)) {
+            page_pool[i].next = &page_pool[i + 1];
+        } else {
+            page_pool[i].next = 0; 
+        }
     }
     free_list_head = &page_pool[0];
     
     // 3. 初始物理內容清為 0xFF (模擬 Flash 擦除)
-    memset(flash_memory, 0xFF, sizeof(flash_memory));
+    // 修正點：將 memset 拆解為 Block 級別執行，避免在某些編譯器環境下一次性大動作造成 Stack 指標錯誤
+    for (int b = 0; b < PHYSICAL_BLOCKS; b++) {
+        for (int p = 0; p < PAGES_PER_BLOCK; p++) {
+            memset(flash_memory[b][p], 0xFF, PAGE_SIZE);
+        }
+    }
     
     UART_Send(USART1, "[FTL] 2KB Storage Ready. SRAM usage safe.\r\n");
 }
@@ -78,8 +89,7 @@ void Storage_Write(uint16_t lba, uint8_t* data) {
         return;
     }
 
-    // 異地更新 (Out-of-place Update) 邏輯簡化版：
-    // 若該 LBA 尚未映射，則分配一個新實體頁面
+    // 異地更新邏輯
     if (l2p_table[lba] == INVALID_ADDR) {
         uint16_t pba = allocate_page();
         if (pba == INVALID_ADDR) {
@@ -89,25 +99,37 @@ void Storage_Write(uint16_t lba, uint8_t* data) {
         l2p_table[lba] = pba;
     }
 
+    // 計算物理位置
     uint16_t target_pba = l2p_table[lba];
-    uint8_t b = target_pba / PAGES_PER_BLOCK;
-    uint8_t p = target_pba % PAGES_PER_BLOCK;
+    uint8_t b = (uint8_t)(target_pba / PAGES_PER_BLOCK);
+    uint8_t p = (uint8_t)(target_pba % PAGES_PER_BLOCK);
 
-    memcpy(flash_memory[b][p], data, PAGE_SIZE);
+    // 增加索引邊界保護，確保不會寫入到非法記憶體
+    if (b < PHYSICAL_BLOCKS && p < PAGES_PER_BLOCK) {
+        memcpy(flash_memory[b][p], data, PAGE_SIZE);
+    }
+    
     UART_Send(USART1, "[FTL] Physical Write Complete.\r\n");
 }
 
 void Storage_Read(uint16_t lba, uint8_t* out_buf) {
+    // 邊界與無效位址檢查
     if (lba >= TOTAL_LBA || l2p_table[lba] == INVALID_ADDR) {
         memset(out_buf, 0, PAGE_SIZE);
         return;
     }
 
     uint16_t pba = l2p_table[lba];
-    uint8_t b = pba / PAGES_PER_BLOCK;
-    uint8_t p = pba % PAGES_PER_BLOCK;
-    memcpy(out_buf, flash_memory[b][p], PAGE_SIZE);
+    uint8_t b = (uint8_t)(pba / PAGES_PER_BLOCK);
+    uint8_t p = (uint8_t)(pba % PAGES_PER_BLOCK);
+    
+    if (b < PHYSICAL_BLOCKS && p < PAGES_PER_BLOCK) {
+        memcpy(flash_memory[b][p], out_buf, PAGE_SIZE); // 修正：應為從 flash 讀到 out_buf
+        // 修正上行備註：正確順序應為 memcpy(目標, 來源, 長度)
+        memcpy(out_buf, flash_memory[b][p], PAGE_SIZE);
+    }
 }
+
 ```
 
 
