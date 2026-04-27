@@ -7,7 +7,7 @@
 #include "storage.h"
 
 #define RX_BUF_SIZE 1024
-uint8_t rx_buffer[RX_BUF_SIZE];  
+__attribute__((aligned(4))) uint8_t rx_buffer[RX_BUF_SIZE];  
 uint16_t rd_ptr = 0;             
 
 void System_Init(void){
@@ -33,7 +33,7 @@ int main(void) {
     uint32_t last_blink = 0;
     uint8_t led_state = 0;
 
-    UART_Send(USART1, "\r\n--- NVMe diagnostics Mode ---\r\n");
+    UART_Send(USART1, "\r\n--- NVMe 8KB Mode (50%% User Space) ---\r\n");
 
     while (1) {
         if (uart_overrun_occurred) {

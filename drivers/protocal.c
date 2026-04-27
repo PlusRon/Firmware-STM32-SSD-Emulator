@@ -3,8 +3,7 @@
 #include "storage.h"
 #include <string.h>
 
-// 關鍵修正：將緩衝區移出函式內部，防止 Stack Overflow
-static uint8_t g_data_buf[PAGE_SIZE];
+__attribute__((aligned(4))) static uint8_t g_data_buf[PAGE_SIZE];
 
 void Protocol_Parse(uint8_t *packet_buf) {
     NVMe_Command_t *cmd = (NVMe_Command_t *)packet_buf;
@@ -19,7 +18,6 @@ void Protocol_Parse(uint8_t *packet_buf) {
         return;
     }
 
-    // 手動處理 Big-Endian 轉換，比內建函式更穩定
     uint16_t lba = (uint16_t)((packet_buf[2] << 8) | packet_buf[3]);
     uint16_t len = (uint16_t)((packet_buf[4] << 8) | packet_buf[5]);
 
