@@ -3,20 +3,24 @@
 
 #include <stdint.h>
 
-// SSD 規格模擬：16 個物理區塊，每個區塊 32 Byte
-#define TOTAL_BLOCKS   16       
-#define BLOCK_SIZE     32       
-#define INVALID_ADDR   0xFF     // 標記未映射狀態
+// SSD 規格模擬：4 個物理區塊，每個區塊 4 個 Page，每個 Page 32 Byte
+// 總物理頁面數 = 16，與原版 16 Blocks 記憶體用量一致
+#define PHYSICAL_BLOCKS     4     
+#define PAGES_PER_BLOCK     4    
+#define PAGE_SIZE           32    
+#define TOTAL_PAGES         (PHYSICAL_BLOCKS * PAGES_PER_BLOCK) 
 
-// 物理區塊節點：用於 Linked List 管理空閒空間 (Free Pool)
-typedef struct BlockNode {
-    uint8_t id;                // 物理區塊 ID (PBA)
-    struct BlockNode* next;    // 指向鏈結串列下一個空閒塊
-} BlockNode_t;
+#define INVALID_ADDR        0xFF  
+
+// 物理頁面節點：管理空閒頁面 (Free Pool)
+typedef struct PageNode {
+    uint8_t id;                // 物理頁面 ID (0~15)
+    struct PageNode* next;     
+} PageNode_t;
 
 // FTL 核心 API
-void Storage_Init(void);                         // 初始化地圖與空閒鏈表
-void Storage_Write(uint16_t lba, uint8_t* data); // 寫入：包含地圖分配
-void Storage_Read(uint16_t lba, uint8_t* out_buf); // 讀取：包含地圖查找
+void Storage_Init(void);
+void Storage_Write(uint16_t lba, uint8_t* data);
+void Storage_Read(uint16_t lba, uint8_t* out_buf);
 
 #endif
