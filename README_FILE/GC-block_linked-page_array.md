@@ -282,6 +282,142 @@ int main(void) {
 
 
 ### host_sender.py
+####
+```
+import serial
+import struct
+import time
+import random
+from datetime import datetime
+
+# --- ANSI 顏色配置 ---
+class Color:
+    PURPLE = '\033[95m'
+    BLUE   = '\033[94m'
+    CYAN   = '\033[96m'
+    GREEN  = '\033[92m'
+    YELLOW = '\033[93m'
+    RED    = '\033[91m'
+    END    = '\033[0m'
+    BOLD   = '\033[1m'
+    GRAY   = '\033[90m'
+
+# --- 測試配置 ---
+PORT = '/dev/ttyUSB0' 
+BAUD = 115200
+USER_CAPACITY = 32
+PAGE_SIZE = 32
+
+class FTLUnitTester:
+    def __init__(self):
+        try:
+            self.ser = serial.Serial(PORT, BAUD, timeout=0.1)
+            time.sleep(1)
+            self.ser.reset_input_buffer()
+            self.stats = {"pass": 0, "fail": 0, "total": 0}
+        except Exception as e:
+            print(f"{Color.RED}[FATAL]{Color.END} Serial Error: {e}")
+            exit(1)
+
+    def _format_hex(self, data):
+        return data.hex(' ').upper() if data else "NONE"
+
+    def _send_cmd(self, op, lba, length, bad_cs=False):
+        pkt = struct.pack('>BBHH', 0xA5, op, lba, length)
+        cs = (sum(pkt) + (1 if bad_cs else 0)) & 0xFF
+        full_pkt = pkt + struct.pack('B', cs)
+        self.ser.write(full_pkt)
+        return full_pkt
+
+    def _receive_resp(self, expected_data=False):
+        raw = b""
+        start_time = time.time()
+        while (time.time() - start_time) < 0.6: 
+            if self.ser.in_waiting > 0:
+                raw += self.ser.read(self.ser.in_waiting)
+                if expected_data and b"DATA:" in raw:
+                    if len(raw.split(b"DATA:")[1]) >= PAGE_SIZE: break
+                elif not expected_data and len(raw) > 5: break
+            time.sleep(0.01)
+
+        text = raw.decode('ascii', errors='ignore').strip()
+        data_payload = None
+        if b"DATA:" in raw:
+            idx = raw.find(b"DATA:") + 5
+            data_payload = raw[idx : idx + PAGE_SIZE]
+        return raw, text, data_payload
+
+    def run_unit(self, tag, name, op, lba, length=PAGE_SIZE, expect="ACK", check_content=False, bad_cs=False, bad_op=False):
+        self.stats["total"] += 1
+        opcode = 0x99 if bad_op else op
+        
+        tx_raw = self._send_cmd(opcode, lba, length, bad_cs)
+        rx_raw, rx_text, rx_data = self._receive_resp(expected_data=check_content)
+        
+        is_pass = False
+        if expect in rx_text:
+            is_pass = True
+        elif check_content and rx_data and rx_data[0] == lba:
+            is_pass = True
+        
+        status_str = f"{Color.GREEN}PASS{Color.END}" if is_pass else f"{Color.RED}FAIL{Color.END}"
+        print(f"[{Color.BLUE}{tag:6}{Color.END}] {name:32} | LBA:{lba:<3} | [{status_str}]")
+
+        if rx_data and is_pass:
+            print(f"       {Color.GRAY}└─ DATA: {rx_data[:16].hex(' ').upper()} ... (32B){Color.END}")
+        
+        if tag in ["EDGE", "PROT", "RECO"] or not is_pass:
+            if rx_text: print(f"       {Color.CYAN}└─ MSG: \"{rx_text}\"{Color.END}")
+            print(f"       {Color.GRAY}└─ RAW: [{self._format_hex(rx_raw)}]{Color.END}")
+
+        if is_pass: self.stats["pass"] += 1
+        else: self.stats["fail"] += 1
+
+    def header(self, title):
+        print(f"\n{Color.BOLD}{Color.PURPLE}== {title} =={Color.END}")
+        print(f"{Color.GRAY}{'-'*75}{Color.END}")
+
+if __name__ == "__main__":
+    t = FTLUnitTester()
+    print(f"\n{Color.YELLOW}{Color.BOLD}STM32 FTL Logic & Protocol Unit Testing Suite v3.0{Color.END}")
+    print(f"Config: {PORT} @ {BAUD} | Page Size: {PAGE_SIZE} Bytes")
+
+    t.header("STEP 1: Basic Functionality (CRUD)")
+    t.run_unit("IO", "Single Page Write", 0x02, 10)
+    t.run_unit("IO", "Single Page Read & Verify", 0x01, 10, check_content=True)
+
+    t.header("STEP 2: Address Space Pressure Fill")
+    print(f" {Color.GRAY}-> Filling Range 0-31...{Color.END}")
+    for i in range(USER_CAPACITY):
+        t._send_cmd(0x02, i, PAGE_SIZE)
+        if i % 10 == 0: print(f"    Progress: {i}/{USER_CAPACITY}")
+        time.sleep(0.01)
+    t.run_unit("FILL", "Full Range Integrity Check", 0x01, 31, check_content=True)
+
+    t.header("STEP 3: Boundary & Error Injection")
+    t.run_unit("EDGE", "LBA Out of Range Test", 0x02, 32, expect="ERR")
+    t.run_unit("PROT", "Protocol Checksum Attack", 0x02, 5, bad_cs=True, expect="CS")
+    t.run_unit("PROT", "Invalid Opcode Handling", 0x02, 0, bad_op=True, expect="OP")
+
+    t.header("STEP 4: Random Access Verification")
+    for s in sorted(random.sample(range(USER_CAPACITY), 4)):
+        t.run_unit("RAND", f"Random Consistency Check", 0x01, s, check_content=True)
+
+    t.header("STEP 5: System Resilience (Hardware ORE)")
+    print(f" {Color.GRAY}-> Triggering 2000-byte UART Overrun...{Color.END}")
+    t.ser.write(b'\xFF' * 2000)
+    time.sleep(1.2)
+    t.run_unit("RECO", "Post-Overrun Auto-Recovery", 0x01, 10, expect="RECOVER")
+
+    print(f"\n{Color.BOLD}{'='*75}{Color.END}")
+    print(f"  {Color.BOLD}UNIT TEST RESULT - {datetime.now().strftime('%H:%M:%S')}{Color.END}")
+    print(f"  Total: {t.stats['total']} | Passed: {Color.GREEN}{t.stats['pass']}{Color.END} | Failed: {Color.RED}{t.stats['fail']}{Color.END}")
+    print(f"{Color.BOLD}{'='*75}{Color.END}\n")
+    t.ser.close()
+```
+
+
+#### SSD
 ```
 import serial
 import struct
