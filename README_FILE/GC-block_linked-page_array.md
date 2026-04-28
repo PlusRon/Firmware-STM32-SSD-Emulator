@@ -304,8 +304,8 @@ class Color:
 # --- 測試配置 ---
 PORT = '/dev/ttyUSB0' 
 BAUD = 115200
-USER_CAPACITY = 64
-PAGE_SIZE = 64
+USER_CAPACITY = 32
+PAGE_SIZE = 32
 
 class FTLUnitTester:
     def __init__(self):
