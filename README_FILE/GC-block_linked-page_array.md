@@ -367,7 +367,7 @@ class FTLUnitTester:
 
         # 輸出詳細 Data (僅讀取測試)
         if rx_data and is_pass:
-            print(f"       {Color.GRAY}└─ DATA: {rx_data[:16].hex(' ').upper()} ... (64B){Color.END}")
+            print(f"       {Color.GRAY}└─ DATA: {rx_data[:16].hex(' ').upper()} ... (32B){Color.END}")
         
         # 輸出錯誤訊息或異常 Raw (僅 EDGE/PROT/RECO 或 FAIL 時)
         if tag in ["EDGE", "PROT", "RECO"] or not is_pass:
