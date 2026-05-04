@@ -13,7 +13,12 @@
 /* Over-Provisioning: 50% 空間留給 GC，僅開放 50% 給使用者 */
 #define USER_PAGES          (TOTAL_PAGES / 2) // 32 Pages
 
-#define INVALID_ADDR        0xFF  
+#define INVALID_ADDR        0xFF
+
+/* 新增頁面狀態 */
+#define STATE_FREE          0  // 乾淨且可用
+#define STATE_VALID         1  // 存有最新資料 (L2P 映射中)
+#define STATE_DIRTY         2  // 舊資料，可被回收 (Invalid)
 
 /* 物理頁面節點 */
 typedef struct PageNode {
@@ -25,5 +30,6 @@ typedef struct PageNode {
 void Storage_Init(void);
 void Storage_Write(uint16_t lba, uint8_t* data);
 void Storage_Read(uint16_t lba, uint8_t* out_buf);
+void Storage_GC(void); // 暴露 GC 接口供手動或自動觸發
 
 #endif

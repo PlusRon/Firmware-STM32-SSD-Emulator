@@ -123,6 +123,33 @@ if __name__ == "__main__":
     time.sleep(1.2)
     t.run_unit("RECO", "Post-Overrun Auto-Recovery", 0x01, 10, expect="RECOVER")
 
+
+    t.header("STEP 6: Garbage Collection & Out-of-Place Test")
+    print(f" {Color.GRAY}-> Target: Force GC by overwriting the same LBA repeatedly.{Color.END}")
+    print(f" {Color.GRAY}-> Logic: Physical pages (64) will be exhausted soon.{Color.END}")
+    
+    # 重複寫入同一個位址，迫使 FTL 不斷分配新頁面直到消耗完所有空閒頁面 (Free List)
+    # 物理總量 64, User 已佔用部分, 寫入 50 次足以觸發至少一次 GC
+    OVERWRITE_COUNT = 50 
+    gc_triggered = False
+    
+    for i in range(OVERWRITE_COUNT):
+        t._send_cmd(0x02, 7, PAGE_SIZE) # 狂寫 LBA 7
+        raw, text, _ = t._receive_resp()
+        if "GC" in text:
+            gc_triggered = True
+            print(f" [{Color.GREEN}INFO{Color.END}] GC Triggered at write index: {i}")
+        time.sleep(0.005)
+
+    # 最後檢查資料是否依然正確（GC 不應破壞最新資料）
+    t.run_unit("GC", "Post-GC Data Consistency", 0x01, 7, check_content=True)
+    
+    if gc_triggered:
+        print(f" [{Color.GREEN}PASS{Color.END}] Garbage Collection was successfully exercised.")
+    else:
+        print(f" [{Color.YELLOW}WARN{Color.END}] GC was not detected. Try increasing OVERWRITE_COUNT.")
+
+
     print(f"\n{Color.BOLD}{'='*75}{Color.END}")
     print(f"  {Color.BOLD}UNIT TEST RESULT - {datetime.now().strftime('%H:%M:%S')}{Color.END}")
     print(f"  Total: {t.stats['total']} | Passed: {Color.GREEN}{t.stats['pass']}{Color.END} | Failed: {Color.RED}{t.stats['fail']}{Color.END}")
