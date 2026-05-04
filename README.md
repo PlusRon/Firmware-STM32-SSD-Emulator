@@ -114,7 +114,7 @@
       ```
 ## 三、主程式碼實作 (Implementation)
 - #### 硬體抽象層 (`include/`)
-  - #### [stm32f072xb.h 底層暫存器定義實作](README_FILE/hardware_abstraction.md)
+  - #### [stm32f072xb.h 底層暫存器定義實作](README_FILE/Main/hardware_abstraction.md)
 - #### 應用邏輯層 (`app/`)
   - #### [GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](README_FILE/Main/GPIO/Advance_LED_blink_coding.md)
   - #### [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](README_FILE/Main/UART/Advance_UART_coding.md)
