@@ -30,7 +30,7 @@
   |:---|:---|
   |**建置工具 (Build Tool)**|**GNU Make**|
   |**燒錄、除錯 (Flashing & Debugging)** | **OpenOCD**|
-- #### [Linux to STM32 開發環境建置](README_FILE/environment_setup.md)
+- #### [Linux to STM32 開發環境建置](README_FILE/env/environment_setup.md)
 
 ## 二、STM32硬體啟動流程 (Startup Procedure)
 - #### 查閱核心開發文件
