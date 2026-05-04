@@ -48,7 +48,7 @@
       <img width="1009" height="447" alt="image" src="https://github.com/user-attachments/assets/2ca2ff23-cefb-4a80-9369-6bccc6a4b9c1" />
 
 - **撰寫 Linker Script 腳本**：告訴連結器（Linker）如何將編譯好的目標檔案（`.o`）組合，並擺放到正確的記憶體位址
-   - #### [linker_script.ld 實作](README_FILE/linker_script.md)
+   - #### [linker_script.ld 實作](README_FILE/BootLoader/linker_script.md)
      - **MEMORY** 程式碼區塊
      - **SECTIONS** 程式碼區塊
    - `.ld` 是 Linker Script（連結器腳本），使用 **GNU Linker Command Language**（GNU 連結器命令語言）
@@ -67,7 +67,7 @@
 
 
 - **撰寫開機導引 (Bootloader)**：STM32 通電（Power-on）或按下 Reset 鍵的那一刻，CPU 並不具備執行 C 語言環境的能力，必須撰寫 `startup.c` 來手動配置硬體環境，並引導系統進入 `main()`
-  - #### [startup.c 實作](README_FILE/startup.md)
+  - #### [startup.c 實作](README_FILE/BootLoader/startup.md)
     - **中斷向量表 (Vector Table)** : 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 FLASH 起始處
     - **Reset_Handler 程式**： 資料搬家 與 環境初始化
     - **控制 SCB (System Control Block) 的 SYSRESETREQ** : 使異常時能自動恢復與軟體重置
@@ -116,20 +116,20 @@
 - #### 硬體抽象層 (`include/`)
   - #### [stm32f072xb.h 底層暫存器定義實作](README_FILE/hardware_abstraction.md)
 - #### 應用邏輯層 (`app/`)
-  - #### [GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](README_FILE/Advance_LED_blink_coding.md)
-  - #### [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](README_FILE/Advance_UART_coding.md)
-  - #### [模擬 NVMe 通訊協定規範 (Protocol Specification)：Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](README_FILE/nvme.md)
+  - #### [GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](README_FILE/Main/GPIO/Advance_LED_blink_coding.md)
+  - #### [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](README_FILE/Main/UART/Advance_UART_coding.md)
+  - #### [模擬 NVMe 通訊協定規範 (Protocol Specification)：Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](README_FILE/Main/NVMe/nvme.md)
 
 ## 四、自動化建置系統 STM32 Makefile
 為 STM32 (Cortex-M0) 建置一套具備 **增量編譯 (Incremental Build)**、**空間優化 (Space Optimization)** 與 **OpenOCD一鍵燒錄** 功能的 Makefile
-- #### [Makefile 兩階段編譯、燒入實作](README_FILE/makefile.md)
+- #### [Makefile 兩階段編譯、燒入實作](README_FILE/Makefile/makefile.md)
 - #### 核心硬體觀念：32 位元處理器與 16 位元指令
   - **32 位元處理器 (Cortex-M0)** ： 指的是 **資料寬度**。暫存器與 ALU 都是 32-bit，運算範圍達 $0$ 到 $2^{32}-1$
   - **16 位元指令集 (Thumb)** ： 指的是 **指令長度**。為了提高 **代碼密度 (Code Density)**，在有限的 Flash 空間內塞入更多指令
   - 運作原理 ： CPU 內部的 **指令解碼器 (Instruction Decoder)** 會在執行瞬間將 **16-bit Thumb 指令解譯為 32-bit** 的運算動作，兼顧空間與效能
 
 ## 五、除錯 (Debugging)
-- #### [非侵入式除錯 (Non-intrusive Debugging)](README_FILE/Non-intrusive_Debugging.md)
+- #### [非侵入式除錯 (Non-intrusive Debugging)](README_FILE/Debug/Non-intrusive_Debugging.md)
 
 
 
