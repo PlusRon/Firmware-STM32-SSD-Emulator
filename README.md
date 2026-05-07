@@ -19,6 +19,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
   - [GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](#GPIO-原子性操作-BSRRSysTick-非阻塞時基系統)
   - [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](#UART-非阻斷式非同步收發資料處理-UARTDMARing-BufferIDLEFlow-ControlSystem-Tick)
   - [NVMe-like 通訊協定規範 (Protocol Specification)：Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](#模擬-NVMe-通訊協定規範-Protocol-SpecificationProducer-Consumer-modelChecksumEndiannessOREUnit-Testing)
+  - [FTL 之 虛擬實體位址映射表(L2P)、異地更新(Out-of-place Update)、垃圾回收(Garbage Collection)、Over-Privisioning](#FTL-之-虛擬實體位址映射表L2P異地更新Outofplace Update垃圾回收Garbage CollectionOver-Privisioning)
 #### [自動化建置系統 STM32 Makefile](#四自動化建置系統-STM32-Makefile)
 #### [除錯 (Debugging)](#五除錯-Debugging)
 
@@ -123,7 +124,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
   - #### [GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](README_FILE/Main/GPIO/Advance_LED_blink_coding.md)
   - #### [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](README_FILE/Main/UART/Advance_UART_coding.md)
   - #### [模擬 NVMe 通訊協定規範 (Protocol Specification)：Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](README_FILE/Main/NVMe/nvme.md)
-  - #### [FTL：L2P、Garbage Collection、Over Privisioning]()
+  - #### [FTL 之 虛擬實體位址映射表(L2P)、異地更新(Out of place Update)、垃圾回收(Garbage Collection)、Over Privisioning](README_FILE/L2P/L2P_GC.md)
 
 ## 四、自動化建置系統 STM32 Makefile
 為 STM32 (Cortex-M0) 建置一套具備 **增量編譯 (Incremental Build)**、**空間優化 (Space Optimization)** 與 **OpenOCD一鍵燒錄** 功能的 Makefile
