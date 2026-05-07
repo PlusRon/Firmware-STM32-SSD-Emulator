@@ -1,10 +1,37 @@
 # FTL with NVMe-like protocol
 實作基於 STM32F072 的輕量級 SSD 模擬器，技術包含 L2P (Logical to Physical) 映射表、Out-of-place Update (異地更新) 以及具備 50% Over-Provisioning (OP) 空間的 Garbage Collection (垃圾回收) 機制。
 
-## 核心技術
-### Page-Level FTL (Flash Translation Layer)
-模擬真實 NAND Flash 的物理限制 (Program after Erase)，實作了高效的地址轉換邏輯
+## L2P Table、Garbage Collection
+### (1) Page-Level FTL (Flash Translation Layer)
+模擬真實 NAND Flash 的物理限制 (Program after Erase)，實作地址轉換邏輯
+- **L2P Mapping**：透過映射表將主機端的邏輯位址 (LBA) 轉換為 Flash 內部的物理位址 (PBA)
+- **物理空間管理**：使用 `PageNode_t` 鏈結串列維護 Free List，實現 $O(1)$ 時間複雜度的頁面分配
 
+### (2) Out-of-place Update (異地更新)
+符合 Flash 寫入前必須抹除的特性，不可執行原地覆寫（In-place Update）
+- 每次寫入請求都會從 Free List 分配一個全新的 PBA
+- 舊的資料頁面被標記為 `STATE_DIRTY`，不再被映射表指向，等待後續回收
+
+### (3) 50% Over-Provisioning (OP) 與垃圾回收
+- **空間配置**：總容量 64 Pages，使用者僅可見 32 Pages，其餘保留給 GC 機制
+- **GC 機制**：當物理空閒頁面耗盡時，自動觸發垃圾回收程序。系統會掃描所有 `STATE_DIRTY` 頁面，執行抹除並還原至 Free List 中，確保系統持續運行
+
+## 通訊協定 (NVMe-like Protocol)
+|偏移量|欄位名稱|長度|說明|
+|:---|:---|:---|:---|
+|0|Start Byte|1B|固定值 0xA5|
+|1|Opcode|1B|`0x01: Read`, `0x02: Write`|
+|2-3|LBA|2B|邏輯區塊位址 (Big-Endian)|
+|4-5|Length|2B|資料長度 (Big-Endian)|
+|6|Checksum|1B|前 6 Bytes 之累積和 (Mod 256)|
+
+## 自動化測試驗證
+Python 測試腳本 `host_sender.py`，支援以下測試階段
+- STEP 1 **(CRUD)**：驗證單一頁面的讀寫一致性。
+- STEP 2 **(Pressure Fill)**：填滿所有使用者 LBA 位址，測試邊界處理。
+- STEP 3 **(Error Injection)**：注入錯誤的 Checksum 或無效 Opcode，驗證協定韌性。
+- STEP 5 **(Hardware Resilience)**：模擬高流量導致的 UART Overrun，驗證 DMA 自動重置功能。
+- STEP 6 **(GC Stress Test)**：連續複寫相同 LBA，迫使系統耗盡物理頁面並觀察 GC 觸發與資料完整性。
 
 ## 程式碼
 ### storage.h
