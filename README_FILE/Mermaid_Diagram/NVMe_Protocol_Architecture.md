@@ -49,8 +49,11 @@ sequenceDiagram
     DMA-->>CPU: 更新 CNDTR (wr_ptr 變動)
     Note over CPU: IRQ : UART 中斷 偵測到 IDLE 旗標 or (wr_ptr != rd_ptr)
 
-    CPU->>Buffer: 檢查 rd_ptr 處是否有 0xA5
-    Buffer-->>CPU: 回傳資料
+    opt buffer 資料數 >= PKT_SIZE
+        CPU->>Buffer: 檢查 rd_ptr 處是否有 0xA5
+        Buffer-->>CPU: 回傳資料
+    end
+    
     
     alt Checksum 正確
         Note over CPU: __builtin_bswap16()
