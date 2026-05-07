@@ -1,5 +1,12 @@
-# L2P , Out-of-place update, and GC (Over-Provisioning)
+# FTL with NVMe-like protocol
+實作基於 STM32F072 的輕量級 SSD 模擬器，技術包含 L2P (Logical to Physical) 映射表、Out-of-place Update (異地更新) 以及具備 50% Over-Provisioning (OP) 空間的 Garbage Collection (垃圾回收) 機制。
 
+## 核心技術
+### Page-Level FTL (Flash Translation Layer)
+模擬真實 NAND Flash 的物理限制 (Program after Erase)，實作了高效的地址轉換邏輯
+
+
+## 程式碼
 ### storage.h
 ```
 #ifndef STORAGE_H
