@@ -52,13 +52,15 @@ sequenceDiagram
     Buffer-->>CPU: 回傳資料
     
     alt Checksum 正確
+        Note over CPU: __builtin_bswap16()
+        CPU->>CPU: 將 LBA/Len 從大端序翻轉為小端序
+        Note over CPU: Handle READ / WRITE
         CPU->>Host: 回傳 [ACK] READ_OK / WRITE_OK
     else Checksum 錯誤
         CPU->>Host: 回傳 [ERR] Checksum Mismatch
     end
 
-    Note over CPU: __builtin_bswap16()
-    CPU->>CPU: 將 LBA/Len 從大端序翻轉為小端序
+    
 
     Note over Host: 負向測試：刻意噴 2000 Bytes
     Host->>DMA: Overflowing Data...
