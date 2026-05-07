@@ -1,3 +1,63 @@
+### 系統時序圖 (Sequence Diagram)
+
+
+```mermaid
+sequenceDiagram
+    autonumber
+    
+    participant PC as Host (Python Tester)
+    participant HW as STM32 Hardware (DMA/UART/CPU)
+    participant Startup as Startup & Linker (.ld/.c)
+    participant Buffer as UART Ring Buffer
+    participant FTL as FTL Logic (L2P/GC)
+    participant Storage as Physical Flash (RAM)
+
+    Note over HW, Startup: --- [階段一] 手寫開機與環境建立 (Boot Sequence) ---
+    
+    HW->>Startup: Power On / Reset 觸發
+    Startup->>HW: 讀取 Linker Script 定義之 Stack Pointer
+    Startup->>Storage: Data Relocation (將 .data 從 Flash 搬移至 RAM)
+    Startup->>Storage: BSS Zeroing (將未初始化區域清零)
+    Startup->>HW: 初始化 SysTick, UART, DMA 配置
+    Startup->>FTL: 執行 Storage_Init() (建立 L2P 表與 Free List)
+    Startup->>HW: 跳轉至 main() 進入主迴圈
+
+    Note over PC, Buffer: --- [階段二] 高效能通訊 (NVMe-like Protocol) ---
+
+    PC->>HW: 發送 Big-Endian 封包 (Op, LBA, CS)
+    Note over HW: DMA 背景自動搬運資料 (非阻塞)
+    HW->>Buffer: 寫入資料至 rx_buffer
+    Note over HW: 偵測到 UART IDLE (封包傳輸結束)
+    HW->>Buffer: 觸發中斷，更新 wr_ptr
+
+    Note over Buffer, Storage: --- [階段三] FTL 指令解析與 GC 觸發 ---
+
+    Buffer->>FTL: 讀取 0xA5 起始字元，驗證 Checksum
+    FTL->>FTL: 端序轉換 (Big to Little Endian)
+    
+    rect rgb(0, 0, 139)
+        Note right of FTL: 寫入邏輯 (Out-of-place Update)
+        FTL->>FTL: allocate_page() 檢查 Free List
+        alt Free List 為空 (物理空間耗盡)
+            FTL->>FTL: 觸發 Storage_GC()
+            FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
+            FTL->>FTL: 回還頁面至 Free List
+        end
+        FTL->>Storage: 物理寫入資料至新 PBA
+        FTL->>FTL: 更新 L2P 表: LBA -> New PBA
+        FTL->>FTL: 將舊 PBA 標記為 STATE_DIRTY
+    end
+
+    FTL-->>PC: 回傳 ACK / DATA (透過 UART)
+    
+    Note over PC, HW: --- [異常處理] ORE Recovery ---
+    PC->>HW: 模擬高流量導致 Overrun (ORE)
+    HW->>Buffer: 偵測到 ORE 旗標
+    Buffer->>HW: 執行 DMA_Reset() & 清空緩衝區
+    Buffer-->>PC: 回傳 "SYSTEM RECOVERED"
+```
+
+
 ### 系統生命週期與運作狀態圖 (State Diagram)
 ```mermaid  
 stateDiagram-v2
