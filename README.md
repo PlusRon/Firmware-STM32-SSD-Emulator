@@ -22,7 +22,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
 #### [除錯 (Debugging)](#五除錯-Debugging)
 
 ## 一、開發環境 (Environment Setup)
-本專案捨棄笨重的 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
+本專案在 無 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
 - #### Hardware Requirements
   |開發版 (Dev Board) | **STM32F072B-DISCOVERY** |
   |:---|:---|
