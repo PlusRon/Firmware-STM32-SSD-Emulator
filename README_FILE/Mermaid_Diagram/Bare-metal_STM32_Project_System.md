@@ -29,7 +29,7 @@ sequenceDiagram
 
     Note over Systick, HW: 每 1ms 觸發一次中斷，VAL 1 減 0， msTicks++
     loop 無窮迴圈 while(1)
-        Note over HW, Systick: 非阻塞時間檢查(預防系統當機)
+        Note over HW, Systick: --- [階段二] 非阻塞時間檢查(預防系統當機) ---
         HW->>Systick: 讀取 get_tick()
         Systick-->>HW: 回傳當前 msTicks
         
@@ -41,15 +41,19 @@ sequenceDiagram
     end
     
 
-    Note over PC, Buffer: --- [階段二] 高效能通訊 (NVMe-like Protocol) ---
+    Note over PC, Buffer: --- [階段三] 高效能通訊 (NVMe-like Protocol) ---
 
-    PC->>HW: 發送 Big-Endian 封包 (Op, LBA, CS)
-    Note over HW: DMA 背景自動搬運資料 (非阻塞)
-    HW->>Buffer: 寫入資料至 rx_buffer
-    Note over HW: 偵測到 UART IDLE (封包傳輸結束)
-    HW->>Buffer: 觸發中斷，更新 wr_ptr
+    PC->>HW: 發送 Big-Endian 封包 7 Bytes(Op, LBA, CS)
+    Note over HW: DMA 背景自動搬運資料 (非阻塞，不佔用 CPU)
+    HW->>Buffer: 自動寫入資料至 rx_buffer
+    HW->>HW: 更新 CNDTR (wr_ptr 變動)
+    Note over HW: UART-IRQ 偵測到 IDLE 旗標(封包傳輸結束) or (wr_ptr != rd_ptr)
+    opt buffer 資料數 >= PKT_SIZE
+        HW->>Buffer: 檢查 rd_ptr 處是否有 0xA5
+        Buffer-->>HW: 回傳資料
+    end
 
-    Note over Buffer, Storage: --- [階段三] FTL 指令解析與 GC 觸發 ---
+    Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
 
     Buffer->>FTL: 讀取 0xA5 起始字元，驗證 Checksum
     FTL->>FTL: 端序轉換 (Big to Little Endian)
