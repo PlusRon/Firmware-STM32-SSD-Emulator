@@ -47,6 +47,7 @@ sequenceDiagram
     Note over DMA: 背景搬運，不佔用 CPU
     DMA->>Buffer: 自動寫入 rx_buffer
     DMA-->>CPU: 更新 CNDTR (wr_ptr 變動)
+    Note over CPU: IRQ : UART 中斷 偵測到 IDLE 旗標 or (wr_ptr != rd_ptr)
 
     CPU->>Buffer: 檢查 rd_ptr 處是否有 0xA5
     Buffer-->>CPU: 回傳資料
@@ -64,7 +65,7 @@ sequenceDiagram
 
     Note over Host: 負向測試：刻意噴 2000 Bytes
     Host->>DMA: Overflowing Data...
-    Note over CPU: 偵測到 ORE 旗標
+    Note over CPU: IRQ : UART 中斷 偵測到 ORE 旗標
     CPU->>CPU: 重置 DMA & 清空緩衝區
     CPU->>Host: 回傳 [SYS] ORE_ERROR
 ```
