@@ -2,6 +2,7 @@
 採用 **BSRR 暫存器** 實現 GPIO 的 **原子性操作**，藉由硬體 **RS 鎖存機制 消除 讀取-修改-寫回** 造成的 **Race Condition** 風險，確保高頻中斷環境下的位準正確性。同時結合 **SysTick 核心計時器** 建立毫秒級全域時基，透過 **無符號整數減法規避溢位問題**，實現精確且 **非阻塞** 的 **虛擬多工任務調度**
 
 ## 一、 BSRR (Bit Set Reset Register) - 確保硬體操作的原子性
+- GPIO BSRR 原子操作狀態圖 (State Diagram)
 ```mermaid
 stateDiagram-v2
     direction TB
@@ -67,7 +68,7 @@ stateDiagram-v2
 
 ## 二、 SysTick 時基系統 — 從 Handler 到 Task 調度
 SysTick (System Tick Timer) 能在 **不使用即時作業系統(RTOS)** 的情況下，依然能精確 **管理多個併行任務**。`SysTick` 是內建於 ARM Cortex-M 核心內的一個 **24 位元遞減計數器**，是為了提供一個穩定的 **心跳 (Heartbeat)**，讓系統擁有統一的 ms 級 時間戳記，實現非阻塞式的定時任務
-
+- SysTick 非阻塞調度時序圖 (Sequence Diagram)
 ```mermaid
 sequenceDiagram
     autonumber
