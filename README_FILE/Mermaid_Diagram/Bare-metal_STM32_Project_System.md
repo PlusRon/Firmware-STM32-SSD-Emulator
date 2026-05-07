@@ -6,21 +6,26 @@ sequenceDiagram
     autonumber
     
     participant PC as Host (Python Tester)
-    participant HW as STM32 Hardware (DMA/UART/CPU)
-    participant Startup as Startup & Linker (.ld/.c)
-    participant Buffer as UART Ring Buffer
+    participant HW as STM32 Hardware (CPU/DMA/UART/GPIO)
+    participant Startup as  Linker & Startup (.ld/.c)
+    participant Buffer as Ring Buffer (RAM)
+    participant Ram as RAM
     participant FTL as FTL Logic (L2P/GC)
-    participant Storage as Physical Flash (RAM)
+    participant Storage as Physical Flash
 
     Note over HW, Startup: --- [階段一] 手寫開機與環境建立 (Boot Sequence) ---
     
     HW->>Startup: Power On / Reset 觸發
-    Startup->>HW: 讀取 Linker Script 定義之 Stack Pointer
+    Startup->>Ram: 讀取 Linker Script 定義之 Main Stack Pointer(MSP)
+    Ram-->>Startup: 讀取 Linker Script 定義之 Main Stack Pointer(MSP)
     Startup->>Storage: Data Relocation (將 .data 從 Flash 搬移至 RAM)
-    Startup->>Storage: BSS Zeroing (將未初始化區域清零)
-    Startup->>HW: 初始化 SysTick, UART, DMA 配置
-    Startup->>FTL: 執行 Storage_Init() (建立 L2P 表與 Free List)
+    Storage-->>Ram: Data Relocation (將 .data 從 Flash 搬移至 RAM)
+    Startup->>Ram: BSS Zeroing (將未初始化區域清零)
+
     Startup->>HW: 跳轉至 main() 進入主迴圈
+    HW->>HW: 系統初始化 RCC, GPIO, SysTick, UART, DMA 配置
+    HW->>FTL: 執行 Storage_Init() (建立 L2P 表與 Free List)
+    
 
     Note over PC, Buffer: --- [階段二] 高效能通訊 (NVMe-like Protocol) ---
 
