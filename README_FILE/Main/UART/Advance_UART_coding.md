@@ -1,5 +1,6 @@
 # UART 非阻斷式、非同步收發資料處理
 建構一個 **非阻斷式(Non-blocking) 處理架構**，以解決 **阻塞式等待 (Polling)** 與 **頻繁中斷(Interrupt per Byte)** 兩個問題。透過 **DMA** 與 **Ring Buffer (循環緩衝區)** 的概念，實現 **通訊層** 與 **應用層** 的 **解耦**，讓 CPU 能在接收資料的同時，並行處理如 LED 閃爍、感測器運算等背景任務，挑戰平衡 通訊即時性 與 任務並行處理 兩任務。
+- UART 非阻斷式系統狀態圖 (State Diagram)
 ```mermaid
 stateDiagram-v2
     direction TB
@@ -35,7 +36,7 @@ stateDiagram-v2
     MainLoop --> DMA_Worker : Byte Received
 ```
 
-
+- DMA Ring Buffer 與雙流控架構圖 (Architecture Diagram)
 ```mermaid
 graph LR
     subgraph "外部發送端 (PC/Sensor)"
@@ -81,7 +82,7 @@ graph LR
     style App fill:#e1f5fe,stroke:#01579b
     style DMA_Ctrl fill:#fff3e0,stroke:#e65100
 ```
-
+- SysTick 非阻塞式調度邏輯 (UML Activity Diagram)
 ```mermaid
 sequenceDiagram
     participant ST as SysTick (Hard)
