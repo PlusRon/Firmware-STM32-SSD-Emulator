@@ -15,7 +15,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
 - [撰寫開機導引 (Bootloader) startup.c 實作](#startupc-實作)
 #### [主程式碼實作 (Implementation)](#三主程式碼實作-Implementation)
 - [硬體抽象層：stm32f072xb.h 底層暫存器定義實作](#stm32f072xbh-底層暫存器定義實作)
-- [應用邏輯層](#GPIO-原子性操作-BSRRSysTick-非阻塞時基系統)
+- [應用邏輯層](#應用邏輯層-app)
   - [GPIO 原子性操作 (BSRR)、SysTick 非阻塞時基系統](#GPIO-原子性操作-BSRRSysTick-非阻塞時基系統)
   - [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](#UART-非阻斷式非同步收發資料處理-UARTDMARing-BufferIDLEFlow-ControlSystem-Tick)
   - [NVMe-like 通訊協定規範 (Protocol Specification)：Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](#模擬-NVMe-通訊協定規範-Protocol-SpecificationProducer-Consumer-modelChecksumEndiannessOREUnit-Testing)
