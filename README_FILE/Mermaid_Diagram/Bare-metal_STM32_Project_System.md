@@ -6,6 +6,7 @@ sequenceDiagram
     autonumber
     
     participant PC as Host (Python Tester)
+    participant Systick as SysTick 硬體計數器
     participant HW as STM32 Hardware (CPU/DMA/UART/GPIO)
     participant Startup as  Linker & Startup (.ld/.c)
     participant Buffer as Ring Buffer (RAM)
@@ -23,8 +24,22 @@ sequenceDiagram
     Startup->>Ram: BSS Zeroing (將未初始化區域清零)
 
     Startup->>HW: 跳轉至 main() 進入主迴圈
-    HW->>HW: 系統初始化 RCC, GPIO, SysTick, UART, DMA 配置
+    HW->>HW: 系統初始化 RCC, GPIO, UART, DMA, NVIC, SysTick 配置
     HW->>FTL: 執行 Storage_Init() (建立 L2P 表與 Free List)
+
+    Note over Systick, HW: 每 1ms 觸發一次中斷，VAL 1 減 0， msTicks++
+    loop 無窮迴圈 while(1)
+        Note over HW, Systick: 非阻塞時間檢查
+        HW->>Systick: 讀取 get_tick()
+        Systick-->>HW: 回傳當前 msTicks
+        
+        alt (get_tick - last_blink) >= 500ms
+            HW->>HW: 執行 LED_Toggle()
+            HW->>HW: 更新 last_blink = get_tick()
+        else 時間未到
+            HW->>HW: 執行其他背景任務 (UART/DMA...)
+        end
+    end
     
 
     Note over PC, Buffer: --- [階段二] 高效能通訊 (NVMe-like Protocol) ---
