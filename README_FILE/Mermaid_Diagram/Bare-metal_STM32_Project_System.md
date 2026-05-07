@@ -53,6 +53,28 @@ sequenceDiagram
         Buffer-->>HW: 回傳資料
     end
 
+    alt Checksum 正確
+        Note over HW: __builtin_bswap16()
+        HW->>HW: 將封包中的 LBA 與 Len 從 Big Endian 翻轉為 little
+        % Note over HW: Handle READ / WRITE
+        Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
+        rect rgb(0, 0, 139)
+            Note right of FTL: 寫入邏輯 (Out-of-place Update)
+            FTL->>FTL: allocate_page() 檢查 Free List
+            alt Free List 為空 (物理空間耗盡)
+                FTL->>FTL: 觸發 Storage_GC()
+                FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
+                FTL->>FTL: 回還頁面至 Free List
+            end
+            FTL->>Storage: 物理寫入資料至新 PBA
+            FTL->>FTL: 更新 L2P 表: LBA -> New PBA
+            FTL->>FTL: 將舊 PBA 標記為 STATE_DIRTY
+        end
+        HW->>PC: 回傳 [ACK] READ_OK / WRITE_OK
+    else Checksum 錯誤
+        HW->>PC: 回傳 [ERR] Checksum Mismatch
+    end
+
     Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
 
     Buffer->>FTL: 讀取 0xA5 起始字元，驗證 Checksum
