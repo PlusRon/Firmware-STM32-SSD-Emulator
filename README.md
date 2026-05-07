@@ -20,7 +20,6 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
   - [UART 非阻斷式、非同步收發資料處理 (UART、DMA、Ring Buffer、IDLE、Flow Control、System Tick)](#UART-非阻斷式非同步收發資料處理-UARTDMARing-BufferIDLEFlow-ControlSystem-Tick)
   - [NVMe-like 通訊協定規範 (Protocol Specification)：Producer Consumer model、Checksum、Endianness、ORE、Unit Testing](#模擬-NVMe-通訊協定規範-Protocol-SpecificationProducer-Consumer-modelChecksumEndiannessOREUnit-Testing)
   - [FTL 之 虛擬實體位址映射表(L2P)、異地更新(Out-of-place Update)、垃圾回收(Garbage Collection)、Over-Privisioning](#FTL-之-虛擬實體位址映射表L2P異地更新Out-of-place-Update垃圾回收Garbage-CollectionOver-Privisioning)
-  - FTL 之 虛擬實體位址映射表(L2P)、異地更新(Out of place Update)、垃圾回收(Garbage Collection)、Over Privisioning
 #### [自動化建置系統 STM32 Makefile](#四自動化建置系統-STM32-Makefile)
 #### [除錯 (Debugging)](#五除錯-Debugging)
 
