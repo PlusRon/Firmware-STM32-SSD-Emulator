@@ -9,7 +9,7 @@
 - #### Automation
   - Python-based Host Driver(**pySerial**) for **Negative Testing**, **Error Injection** and **automated validation** of the **NVMe read/write** command set
 
-<img src="/images/NMVe_Protocol_Sequence_Diagram.png" alt="NVMe-Protocol" style="width:100%">
+<img src="/images/NVMe_Protocol_SequenceDiagram.png" alt="NVMe-Protocol" style="width:100%">
 
 ## 一、環境建置
 ### 查看 python 版本
