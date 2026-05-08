@@ -1,109 +1,81 @@
----
-```
-#ifndef STM32F072XB_H
-#define STM32F072XB_H
 
-#include <stdint.h>
+## 一、程式碼實作
+利用 C 語言 結構體成員 **連續配置** 的特性，實現了 **隱形偏移量 (Implicit Offset)**
+### 語法結構解析
+- #### struct 結構 定義 Peripheral Resgister 記憶體映射 I/O (MMIO)
+  - 建立 Peripheral 的 struct
+  - 結構成員配置為該周邊的所有暫存器，照位址 offset 向下排列，因 struct 為連續配置產生隱形 offset
+    - 每個暫存器修飾為 `volatile` 防止編譯器優化，強制 CPU 每次都要執行 **LDR/STR 指令讀取實體記憶體** 的值
+  - 定義 Peripheral 的基底位址
+    - **`#define RCC_BASE    (0x40021000UL)`**
+    - **`#define RCC_BASE    (0x40021000UL)`**
+  - 定義 Peripheral 的結構指標 並 賦值 為 對應的基底位址
+    - **`#define RCC         ((RCC_TypeDef *)  RCC_BASE)`**
+    - **`#define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)`**
+    - 可以透過 **`RCC->AHBENR`** 的方式操作暫存器的內容
+- #### 非 struct 結構 定義 Peripheral Resgister 記憶體映射 I/O (MMIO)
+  ```
+  #define RCC_AHBENR   (*(volatile uint32_t*)(0x40021014))
+  ```
+  - **`volatile`** : 韌體開發的核心，強制 CPU 每次都要執行 **LDR/STR 指令讀取實體記憶體** 的值，防止編譯器優化（因為硬體狀態 像是按鈕輸入是會隨時改變的）
+  - **`(volatile uint32_t*)`** : 告訴編譯器這是一個指向 **32-bit 硬體空間的指標**
+  - **`*`** : **解引用 (Dereference)**，代表要 **操作該地址裡的內容**
 
-/* 定義存取權限 */
-#define __I  volatile const
-#define __O  volatile
-#define __IO volatile
-
-/* 基底位址定義 */
-#define PERIPH_BASE         0x40000000UL
-#define AHBPERIPH_BASE      (PERIPH_BASE + 0x00020000UL)
-#define APB2PERIPH_BASE     (PERIPH_BASE + 0x00010000UL)
-
-/* 周邊位址映射 */
-#define RCC_BASE            (AHBPERIPH_BASE + 0x1000UL)
-#define GPIOA_BASE          (AHBPERIPH_BASE + 0x0000UL)
-#define GPIOC_BASE          (AHBPERIPH_BASE + 0x0800UL)
-#define DMA1_BASE           (AHBPERIPH_BASE + 0x0000UL)
-#define USART1_BASE         (APB2PERIPH_BASE + 0x3800UL)
-
-/* 核心周邊位址 */
-#define SCS_BASE            0xE000E000UL
-#define SysTick_BASE        (SCS_BASE + 0x0010UL)
-
-/* --- 結構體定義 --- */
-
-typedef struct {
-    __IO uint32_t CR;
-    __IO uint32_t CFGR;
-    __IO uint32_t CIR;
-    __IO uint32_t APB2RSTR;
-    __IO uint32_t APB1RSTR;
-    __IO uint32_t AHBENR;
-    __IO uint32_t APB2ENR;
-    __IO uint32_t APB1ENR;
-    __IO uint32_t BDCR;
-    __IO uint32_t CSR;
-    __IO uint32_t AHBRSTR;
-    __IO uint32_t CFGR2;
-    __IO uint32_t CFGR3;
-} RCC_TypeDef;
-
-typedef struct {
-    __IO uint32_t MODER;
-    __IO uint32_t OTYPER;
-    __IO uint32_t OSPEEDR;
-    __IO uint32_t PUPDR;
-    __IO uint32_t IDR;
-    __IO uint32_t ODR;
-    __IO uint32_t BSRR;
-    __IO uint32_t LCKR;
-    __IO uint32_t AFRL;
-    __IO uint32_t AFRH;
-} GPIO_TypeDef;
-
-typedef struct {
-    __IO uint32_t CR1;
-    __IO uint32_t CR2;
-    __IO uint32_t CR3;
-    __IO uint32_t BRR;
-    __IO uint32_t GTPR;
-    __IO uint32_t RTOR;
-    __IO uint32_t RQR;
-    __IO uint32_t ISR;
-    __IO uint32_t ICR;
-    __IO uint32_t RDR;
-    __IO uint32_t TDR;
-} USART_TypeDef;
-
-typedef struct {
-    __IO uint32_t CCR;
-    __IO uint32_t CNDTR;
-    __IO uint32_t CPAR;
-    __IO uint32_t CMAR;
-} DMA_Channel_TypeDef;
-
-typedef struct {
-    __IO uint32_t ISR;
-    __IO uint32_t IFCR;
-    DMA_Channel_TypeDef CH[7];
-} DMA_TypeDef;
-
-typedef struct {
-    __IO uint32_t CTRL;
-    __IO uint32_t LOAD;
-    __IO uint32_t VAL;
-    __I  uint32_t CALIB;
-} SysTick_TypeDef;
-
-/* 指標定義 */
-#define RCC     ((RCC_TypeDef *) RCC_BASE)
-#define GPIOA   ((GPIO_TypeDef *) GPIOA_BASE)
-#define GPIOC   ((GPIO_TypeDef *) GPIOC_BASE)
-#define USART1  ((USART_TypeDef *) USART1_BASE)
-#define DMA1    ((DMA_TypeDef *) DMA1_BASE)
-#define SysTick ((SysTick_TypeDef *) SysTick_BASE)
-
-#endif
-```
+### 解構基底與偏移 (Base & Offset)
+在 STM32 中，周邊設備存取都是透過 **記憶體映射 I/O (MMIO)** 實現，採分層管理架構 (STM32F072 參考手冊)
+#### 1. 總線基位址 (Bus Base Address)：
+- AHB1 總線的起始位址為 **0x4002 0000**，其中 RCC 掛載於此 BUS
+- AHB2 總線的起始位址為 **0x48000000**，其中 GPIO 掛載於此 BUS
+#### 2. 周邊偏移量 (Peripheral Offset)：
+- RCC 位於 AHB2 的偏移處，基位址變為 **0x4002 1000**
+- GPIOC 位於 AHB2 的偏移處，基位址變為 **0x48000800**
+#### 3.暫存器偏移量 (Register Offset)：
+- **RCC (周邊基底) 內部** : 不同的功能之暫存器有各自的偏移，例如 **AHBENR (AHB Peripheral Clock Enable Register)** 的偏移為 **0x14**
+  - **計算公式** : $Address_{AHBENR} = Base_{RCC} + Offset_{AHBENR} = 0x4002 1000 + 0x14 = 0x40021014$
+    -  $Offset_{AHBENR}$ 以C 語言 **struct 成員連續配置** 的特性，實作出偏移
+    - **RCC->AHBENR** 的最終地址: **0x40021014**
+    - 當對該地址的 **第 19 位元 (IOPCEN, I/O Peripheral Clock Enable)** 寫入 1 時，硬體電路會把時鐘訊號送到 GPIOC，該周邊才能開始工作
+    - **低功耗設計（Low Power Design）** : 數位電路中，電晶體翻轉在訊號 0 和 1 切換時最耗電，若時鐘訊號一直跑，即便沒用該腳位，內部百萬電晶體仍會持續翻轉並浪費電力，透過 **RCC（Reset and Clock Control）**，可以只開啟目前需要的硬體模組，省電
+    - 周邊設備（GPIO, UART, SPI…）初始狀態下，其內部的 **時鐘訊號線（Clock Line）都是斷開的**
+      - Bit 17: IOPAEN (GPIOA Enable)
+      - Bit 18: IOPBEN (GPIOB Enable)
+      - Bit 19: IOPCEN (GPIOC Enable)
+      - `RCC_AHBENR |= (1 << 19);` 的二進位的變化如下
+          ```
+          RCC_AHBENR 原值 : 0000 0000 0000 0000 0000 0000 0000 0000
+             (1 << 19)    : 0000 0000 0000 1000 0000 0000 0000 0000
+          -------------------------------------------------------
+             OR 運算後結果 : 0000 0000 0000 1000 0000 0000 0000 0000
+                                           ^ 第 19 位變成 1
+          ```
+      - **原子操作 (Atomic Operations)** : 處理 **共用控制暫存器** 的標準做法，利用 **Read-Modify-Write (RMW)** 操作 (**|=、&=、^|**)，確保只針對第 19 位元進行 Set，不干擾暫存器中其他的配置狀態
+        - RCC_AHBENR 暫存器中同時控制了多個關鍵外設（如 GPIOA, GPIOB, DMA 等）。如果直接使用 **= 賦值** 會意外地將其他已經開啟的外設時鐘全部關閉
+- **GPIOC (周邊基底)內部**  : 不同的功能之暫存器有各自的偏移，例如 **ODR (Output Data Register)** 的偏移為 **0x14**
+  - **計算公式** : $Address_{MODER} = Base_{GPIOC} + Offset_{MODER} = 0x4800 0800 + 0x00 = 0x48000800$
+    - **GPIOC->MODER** 的最終地址: **0x48000800**
+      - 四種模式，輸入、輸出、複用、類比
+      - 硬體設計上規定，每個 Pin 腳 的 Mode 佔用 **2 個 Bits 去控制**
+      - MODER 的 **Bit 12, 13** ： 是一個 **多工器 (MUX)** 電路，負責切換 **Pin 腳 6** 的電路路徑為哪種模式 (輸入、輸出、複用、類比)
+  - **計算公式** : $Address_{ODR} = Base_{GPIOC} + Offset_{ODR} = 0x4800 0800 + 0x14 = 0x48000814$
+    - **GPIOC->ODR** 的最終地址: **0x48000814**
+      - ODR 的 Bit 6 會連接到一個 **輸出驅動器 (Output Driver)** 電路，負責把電壓送到 Pin 6
+  
+## 二、系統架構：AHB 與 APB 資料高速公路
+STM32 內部透過不同的匯流排（Bus）平衡效能與功耗
+- AHB (Advanced High-performance Bus)
+  - 特性 ： 高頻寬、低延遲，掛在系統時鐘下
+  - 對象 ： **Flash、RAM、DMA、GPIO**（為了最快開關）
+- APB (Advanced Peripheral Bus)
+  - 特性 ： 速度較 **慢** 但 **省電**，透過預分頻器運作
+  - 對象 ： UART、SPI、I2C、Timers、ADC
+- 為什麼要區分？
+  - 為了功耗與電磁干擾 (EMI) 的權衡
+  - **高速訊號線翻轉非常耗電**，將低速設備（如 UART）放在 APB 上可大幅 **延長電力壽命**
 
 
-# 標頭檔 `stm32f072xb.h` 之 硬體抽象層設計 (Hardware Abstraction Layer, HAL)
+
+
+# 標頭檔 `stm32f072xb.h` 之 Hardware Abstraction Layer (HAL)
 在嵌入式開發中，不直接操作雜亂的記憶體位址，而是透過 **結構體映射 (Struct Mapping)** 技術建立一套可讀性高、且符合工業標準（如 CMSIS）的抽象層
 ```
 #ifndef STM32F072XB_H
@@ -214,81 +186,6 @@ typedef struct {
 
 #endif /* STM32F072XB_H */
 ```
-## 一、程式碼實作
-利用 C 語言 結構體成員 **連續配置** 的特性，實現了 **隱形偏移量 (Implicit Offset)**
-### 語法結構解析
-- #### struct 結構 定義 Peripheral Resgister 記憶體映射 I/O (MMIO)
-  - 建立 Peripheral 的 struct
-  - 結構成員配置為該周邊的所有暫存器，照位址 offset 向下排列，因 struct 為連續配置產生隱形 offset
-    - 每個暫存器修飾為 `volatile` 防止編譯器優化，強制 CPU 每次都要執行 **LDR/STR 指令讀取實體記憶體** 的值
-  - 定義 Peripheral 的基底位址
-    - **`#define RCC_BASE    (0x40021000UL)`**
-    - **`#define RCC_BASE    (0x40021000UL)`**
-  - 定義 Peripheral 的結構指標 並 賦值 為 對應的基底位址
-    - **`#define RCC         ((RCC_TypeDef *)  RCC_BASE)`**
-    - **`#define GPIOC       ((GPIO_TypeDef *) GPIOC_BASE)`**
-    - 可以透過 **`RCC->AHBENR`** 的方式操作暫存器的內容
-- #### 非 struct 結構 定義 Peripheral Resgister 記憶體映射 I/O (MMIO)
-  ```
-  #define RCC_AHBENR   (*(volatile uint32_t*)(0x40021014))
-  ```
-  - **`volatile`** : 韌體開發的核心，強制 CPU 每次都要執行 **LDR/STR 指令讀取實體記憶體** 的值，防止編譯器優化（因為硬體狀態 像是按鈕輸入是會隨時改變的）
-  - **`(volatile uint32_t*)`** : 告訴編譯器這是一個指向 **32-bit 硬體空間的指標**
-  - **`*`** : **解引用 (Dereference)**，代表要 **操作該地址裡的內容**
-
-### 解構基底與偏移 (Base & Offset)
-在 STM32 中，周邊設備存取都是透過 **記憶體映射 I/O (MMIO)** 實現，採分層管理架構 (STM32F072 參考手冊)
-#### 1. 總線基位址 (Bus Base Address)：
-- AHB1 總線的起始位址為 **0x4002 0000**，其中 RCC 掛載於此 BUS
-- AHB2 總線的起始位址為 **0x48000000**，其中 GPIO 掛載於此 BUS
-#### 2. 周邊偏移量 (Peripheral Offset)：
-- RCC 位於 AHB2 的偏移處，基位址變為 **0x4002 1000**
-- GPIOC 位於 AHB2 的偏移處，基位址變為 **0x48000800**
-#### 3.暫存器偏移量 (Register Offset)：
-- **RCC (周邊基底) 內部** : 不同的功能之暫存器有各自的偏移，例如 **AHBENR (AHB Peripheral Clock Enable Register)** 的偏移為 **0x14**
-  - **計算公式** : $Address_{AHBENR} = Base_{RCC} + Offset_{AHBENR} = 0x4002 1000 + 0x14 = 0x40021014$
-    -  $Offset_{AHBENR}$ 以C 語言 **struct 成員連續配置** 的特性，實作出偏移
-    - **RCC->AHBENR** 的最終地址: **0x40021014**
-    - 當對該地址的 **第 19 位元 (IOPCEN, I/O Peripheral Clock Enable)** 寫入 1 時，硬體電路會把時鐘訊號送到 GPIOC，該周邊才能開始工作
-    - **低功耗設計（Low Power Design）** : 數位電路中，電晶體翻轉在訊號 0 和 1 切換時最耗電，若時鐘訊號一直跑，即便沒用該腳位，內部百萬電晶體仍會持續翻轉並浪費電力，透過 **RCC（Reset and Clock Control）**，可以只開啟目前需要的硬體模組，省電
-    - 周邊設備（GPIO, UART, SPI…）初始狀態下，其內部的 **時鐘訊號線（Clock Line）都是斷開的**
-      - Bit 17: IOPAEN (GPIOA Enable)
-      - Bit 18: IOPBEN (GPIOB Enable)
-      - Bit 19: IOPCEN (GPIOC Enable)
-      - `RCC_AHBENR |= (1 << 19);` 的二進位的變化如下
-          ```
-          RCC_AHBENR 原值 : 0000 0000 0000 0000 0000 0000 0000 0000
-             (1 << 19)    : 0000 0000 0000 1000 0000 0000 0000 0000
-          -------------------------------------------------------
-             OR 運算後結果 : 0000 0000 0000 1000 0000 0000 0000 0000
-                                           ^ 第 19 位變成 1
-          ```
-      - **原子操作 (Atomic Operations)** : 處理 **共用控制暫存器** 的標準做法，利用 **Read-Modify-Write (RMW)** 操作 (**|=、&=、^|**)，確保只針對第 19 位元進行 Set，不干擾暫存器中其他的配置狀態
-        - RCC_AHBENR 暫存器中同時控制了多個關鍵外設（如 GPIOA, GPIOB, DMA 等）。如果直接使用 **= 賦值** 會意外地將其他已經開啟的外設時鐘全部關閉
-- **GPIOC (周邊基底)內部**  : 不同的功能之暫存器有各自的偏移，例如 **ODR (Output Data Register)** 的偏移為 **0x14**
-  - **計算公式** : $Address_{MODER} = Base_{GPIOC} + Offset_{MODER} = 0x4800 0800 + 0x00 = 0x48000800$
-    - **GPIOC->MODER** 的最終地址: **0x48000800**
-      - 四種模式，輸入、輸出、複用、類比
-      - 硬體設計上規定，每個 Pin 腳 的 Mode 佔用 **2 個 Bits 去控制**
-      - MODER 的 **Bit 12, 13** ： 是一個 **多工器 (MUX)** 電路，負責切換 **Pin 腳 6** 的電路路徑為哪種模式 (輸入、輸出、複用、類比)
-  - **計算公式** : $Address_{ODR} = Base_{GPIOC} + Offset_{ODR} = 0x4800 0800 + 0x14 = 0x48000814$
-    - **GPIOC->ODR** 的最終地址: **0x48000814**
-      - ODR 的 Bit 6 會連接到一個 **輸出驅動器 (Output Driver)** 電路，負責把電壓送到 Pin 6
-  
-## 二、系統架構：AHB 與 APB 資料高速公路
-STM32 內部透過不同的匯流排（Bus）平衡效能與功耗
-- AHB (Advanced High-performance Bus)
-  - 特性 ： 高頻寬、低延遲，掛在系統時鐘下
-  - 對象 ： **Flash、RAM、DMA、GPIO**（為了最快開關）
-- APB (Advanced Peripheral Bus)
-  - 特性 ： 速度較 **慢** 但 **省電**，透過預分頻器運作
-  - 對象 ： UART、SPI、I2C、Timers、ADC
-- 為什麼要區分？
-  - 為了功耗與電磁干擾 (EMI) 的權衡
-  - **高速訊號線翻轉非常耗電**，將低速設備（如 UART）放在 APB 上可大幅 **延長電力壽命**
-
-
-
 
 
 
