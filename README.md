@@ -25,6 +25,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
   - [FTL 之 虛擬實體位址映射表(L2P)、異地更新(Out-of-place Update)、垃圾回收(Garbage Collection)、Over-Privisioning](#FTL-之-虛擬實體位址映射表L2P異地更新Out-of-place-Update垃圾回收Garbage-CollectionOver-Privisioning)
 #### [自動化建置系統 STM32 Makefile](#四自動化建置系統-STM32-Makefile)
 #### [除錯 (Debugging)](#五除錯-Debugging)
+#### [授權協議 (License)](#授權協議-License)
 
 ## 一、開發環境 (Environment Setup)
 本專案在 無 IDE（如 Keil 或 STM32CubeIDE），採用業界底層開發常見的 GNU Arm Toolchain 與 CLI 工具鏈，掌握從編譯、連結到燒錄的完整硬體主控權
@@ -102,5 +103,5 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
 ## 五、除錯 (Debugging)
 - #### [非侵入式除錯 (Non-intrusive Debugging)](README_FILE/Debug/Non-intrusive_Debugging.md)
 
-
-
+## 授權協議 (License)
+本專案採用 [MIT License](LICENSE) 授權
