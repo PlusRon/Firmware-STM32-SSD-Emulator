@@ -14,7 +14,7 @@ sequenceDiagram
     participant FTL as FTL Logic (L2P/GC)
     participant Storage as Physical Flash
 
-    Note over HW, Startup: --- [階段一] 手寫 Boot Sequence 與環境建立 ---
+    Note over HW, Storage: --- [階段一] 手寫 Boot Sequence 與環境建立 ---
     
     HW->>Startup: Power On / Reset 觸發
     Startup->>Ram: 讀取 Linker Script 定義之 Main Stack Pointer(MSP)
@@ -41,7 +41,7 @@ sequenceDiagram
     end
     
 
-    Note over PC, Buffer: --- [階段三] 高效能通訊 (NVMe-like Protocol) ---
+    Note over PC, Buffer: --- [階段三] 高效能通訊 (NVMe-like Protocol 指令解析 and UART傳輸) ---
 
     PC->>HW: 發送 Big-Endian 封包 7 Bytes(Op, LBA, CS)
     Note over HW: DMA 背景自動搬運資料 (非阻塞，不佔用 CPU)
@@ -57,7 +57,7 @@ sequenceDiagram
         Note over HW: __builtin_bswap16()
         HW->>HW: 將封包中的 LBA 與 Len 從 Big Endian 翻轉為 little
         % Note over HW: Handle READ / WRITE
-        Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
+        Note over Buffer, Storage: --- [階段四] FTL (Out-of-place update, L2P, GC ) 觸發 ---
         HW->>FTL: 由 handle_nvme_write/read() 傳送資料 LBA, len, data buffer of READ/WRITE
         rect rgb(0, 0, 139)
             Note right of FTL: 寫入邏輯 (Out-of-place Update)
