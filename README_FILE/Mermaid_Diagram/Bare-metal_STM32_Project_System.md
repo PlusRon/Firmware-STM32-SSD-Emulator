@@ -58,6 +58,7 @@ sequenceDiagram
         HW->>HW: 將封包中的 LBA 與 Len 從 Big Endian 翻轉為 little
         % Note over HW: Handle READ / WRITE
         Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
+        HW->>FTL: LBA, len, data buffer of READ/WRITE
         rect rgb(0, 0, 139)
             Note right of FTL: 寫入邏輯 (Out-of-place Update)
             FTL->>FTL: allocate_page() 檢查 Free List
@@ -70,7 +71,110 @@ sequenceDiagram
             FTL->>FTL: 更新 L2P 表: LBA -> New PBA
             FTL->>FTL: 將舊 PBA 標記為 STATE_DIRTY
         end
-        HW->>PC: 回傳 [ACK] READ_OK / WRITE_OK
+        FTL->>PC: 回傳 [ACK] READ_OK DATA: ... / [ACK] WRITE_OK (透過 UART)
+    else Checksum 錯誤
+        HW->>PC: 回傳 [ERR] Checksum Mismatch
+    end
+
+    Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
+
+    Buffer->>FTL: 讀取 0xA5 起始字元，驗證 Checksum
+    FTL->>FTL: 端序轉換 (Big to Little Endian)
+    
+    rect rgb(0, 0, 139)
+        Note right of FTL: 寫入邏輯 (Out-of-place Update)
+        FTL->>FTL: allocate_page() 檢查 Free List
+        alt Free List 為空 (物理空間耗盡)
+            FTL->>FTL: 觸發 Storage_GC()
+            FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
+            FTL->>FTL: 回還頁面至 Free List
+        end
+        FTL->>Storage: 物理寫入資料至新 PBA
+        FTL->>FTL: 更新 L2P 表: LBA -> New PBA
+        FTL->>FTL: 將舊 PBA 標記為 STATE_DIRTY
+    end
+
+    FTL-->>PC: 回傳 ACK / DATA (透過 UART)
+    
+    Note over PC, HW: --- [異常處理] ORE Recovery ---
+    PC->>HW: 模擬高流量導致 Overrun (ORE)
+    HW->>Buffer: 偵測到 ORE 旗標
+    Buffer->>HW: 執行 DMA_Reset() & 清空緩衝區
+    Buffer-->>PC: 回傳 "SYSTEM RECOVERED"
+```
+
+### Old Sequence Diagram
+```mermaid
+sequenceDiagram
+    autonumber
+    
+    participant PC as Host (Python Tester)
+    participant Systick as SysTick 硬體計數器
+    participant HW as STM32 Hardware (CPU/DMA/UART/GPIO)
+    participant Buffer as Ring Buffer (RAM)
+    participant Startup as  Linker & Startup (.ld/.c)
+    participant Ram as RAM
+    participant FTL as FTL Logic (L2P/GC)
+    participant Storage as Physical Flash
+
+    Note over HW, Startup: --- [階段一] 手寫 Boot Sequence 與環境建立 ---
+    
+    HW->>Startup: Power On / Reset 觸發
+    Startup->>Ram: 讀取 Linker Script 定義之 Main Stack Pointer(MSP)
+    Ram-->>Startup: 讀取 Linker Script 定義之 Main Stack Pointer(MSP)
+    Startup->>Storage: Data Relocation (將 .data 從 Flash 搬移至 RAM)
+    Storage-->>Ram: Data Relocation (將 .data 從 Flash 搬移至 RAM)
+    Startup->>Ram: BSS Zeroing (將未初始化區域清零)
+
+    Startup->>HW: 跳轉至 main() 進入主迴圈
+    HW->>HW: 系統初始化 RCC, GPIO, UART, DMA, NVIC, SysTick 配置
+    HW->>FTL: 執行 Storage_Init() (建立 L2P 表與 Free List)
+
+    Note over Systick, HW: 每 1ms 觸發一次中斷，VAL 1 減 0， msTicks++
+    loop 無窮迴圈 while(1)
+        Note over HW, Systick: --- [階段二] 非阻塞時間檢查(預防系統當機) ---
+        HW->>Systick: 讀取 get_tick()
+        Systick-->>HW: 回傳當前 msTicks
+        
+        alt (get_tick - last_blink) >= 500ms
+            HW->>HW: 執行 LED_Toggle() 並 更新 last_blink
+        else 時間未到
+            HW->>HW: 執行其他背景任務 (UART/DMA...)
+        end
+    end
+    
+
+    Note over PC, Buffer: --- [階段三] 高效能通訊 (NVMe-like Protocol) ---
+
+    PC->>HW: 發送 Big-Endian 封包 7 Bytes(Op, LBA, CS)
+    Note over HW: DMA 背景自動搬運資料 (非阻塞，不佔用 CPU)
+    HW->>Buffer: 自動寫入資料至 rx_buffer
+    HW->>HW: 更新 CNDTR (wr_ptr 變動)
+    Note over HW: UART-IRQ 偵測到 IDLE 旗標(封包傳輸結束) or (wr_ptr != rd_ptr)
+    opt buffer 資料數 >= PKT_SIZE
+        HW->>Buffer: 檢查 rd_ptr 處是否有 0xA5
+        Buffer-->>HW: 回傳資料
+    end
+
+    alt Checksum 正確
+        Note over HW: __builtin_bswap16()
+        HW->>HW: 將封包中的 LBA 與 Len 從 Big Endian 翻轉為 little
+        % Note over HW: Handle READ / WRITE
+        Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
+        HW->>FTL: LBA, len, data buffer of READ/WRITE
+        rect rgb(0, 0, 139)
+            Note right of FTL: 寫入邏輯 (Out-of-place Update)
+            FTL->>FTL: allocate_page() 檢查 Free List
+            alt Free List 為空 (物理空間耗盡)
+                FTL->>FTL: 觸發 Storage_GC()
+                FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
+                FTL->>FTL: 回還頁面至 Free List
+            end
+            FTL->>Storage: 物理寫入資料至新 PBA
+            FTL->>FTL: 更新 L2P 表: LBA -> New PBA
+            FTL->>FTL: 將舊 PBA 標記為 STATE_DIRTY
+        end
+        FTL->>PC: 回傳 [ACK] READ_OK DATA: ... / [ACK] WRITE_OK (透過 UART)
     else Checksum 錯誤
         HW->>PC: 回傳 [ERR] Checksum Mismatch
     end
