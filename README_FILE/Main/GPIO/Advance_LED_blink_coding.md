@@ -1,7 +1,7 @@
 # GPIO 原子性操作 (BSRR) 與 SysTick 非阻塞時基系統
 採用 **BSRR 暫存器** 實現 GPIO 的 **原子性操作**，藉由硬體 **RS 鎖存機制 消除 讀取-修改-寫回** 造成的 **Race Condition** 風險，確保高頻中斷環境下的位準正確性。同時結合 **SysTick 核心計時器** 建立毫秒級全域時基，透過 **無符號整數減法規避溢位問題**，實現精確且 **非阻塞** 的 **虛擬多工任務調度**
 
-<img src="/images/GPIO_BSRR_SysTick.png" alt="GPIO-BSRR with SysToick" style="width:100%">
+<img src="/images/GPIO_BSRR_LED.png" alt="GPIO-BSRR with SysToick" style="width:100%">
 
 ## 一、 BSRR (Bit Set Reset Register) - 確保硬體操作的原子性
 #### 原子操作 (Atomic Operation)
