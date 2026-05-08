@@ -1,6 +1,6 @@
 # FTL with NVMe-like protocol
 實作基於 STM32F072 的輕量級 SSD 模擬器，技術包含 L2P (Logical to Physical) 映射表、Out-of-place Update (異地更新) 以及具備 50% Over-Provisioning (OP) 空間的 Garbage Collection (垃圾回收) 機制。
-<img src="/images/FTL_UART_Sequence_Diagram.png" alt="System Sequence Diagram" style="width:100%">
+<img src="/images/FTL_SequenceDiagram.png" alt="System Sequence Diagram" style="width:100%">
 
 ## L2P Table、Garbage Collection
 ### (1) Page-Level FTL (Flash Translation Layer)
