@@ -7,6 +7,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
 <img src="images/Firmware-STM32-SSD-Emulator_System_SequenceDiagram.png" alt="System Sequence Diagram" style="width:100%">
 
 ## Outline
+#### [系統時序圖 (Sequence Diagram)](#系統時序圖-Sequence-Diagram)
 #### [開發環境 (Environment Setup)](#一開發環境-Environment-Setup)
 - [Hardware Requirements](#Hardware-Requirements)
 - [Software Toolchain](#Software-Toolchain)
