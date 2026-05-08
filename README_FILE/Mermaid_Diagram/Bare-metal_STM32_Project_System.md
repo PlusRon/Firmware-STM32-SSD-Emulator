@@ -128,6 +128,40 @@ sequenceDiagram
     
     end
 ```
+### GPIO_BSSR_LED
+
+
+```mermaid
+sequenceDiagram
+    autonumber
+    
+    participant PC as Host (Python Tester)
+    participant Aircr as AIRCR暫存器 (SCB)
+    participant Systick as SysTick 硬體計數器
+    participant HW as STM32 Hardware (CPU/DMA/UART/GPIO)
+    participant Buffer as Ring Buffer (RAM)
+    participant Startup as  Linker & Startup (.ld/.c)
+    participant Ram as RAM
+    participant FTL as FTL Logic (L2P/GC)
+    participant Storage as Physical Flash
+
+
+    Note over Systick, HW: 每 1ms 觸發一次中斷，VAL 1 減 0， msTicks++
+    loop 無窮迴圈 while(1)
+        Note over HW, Systick: --- [階段二] 非阻塞時間檢查(預防系統當機) ---
+        HW->>Systick: 讀取 get_tick()
+        Systick-->>HW: 回傳當前 msTicks
+        
+        alt (get_tick - last_blink) >= 500ms
+            HW->>HW: 執行 LED_Toggle() 並 更新 last_blink
+        else 時間未到
+            HW->>HW: 執行其他背景任務 (UART/DMA...)
+        end
+    end
+    
+    
+```
+
 ### Booting
 ```mermaid
 sequenceDiagram
