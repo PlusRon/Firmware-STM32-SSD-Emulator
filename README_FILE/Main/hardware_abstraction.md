@@ -75,7 +75,7 @@ STM32 內部透過不同的匯流排（Bus）平衡效能與功耗
 
 
 
-# 標頭檔 `stm32f072xb.h` 之 Hardware Abstraction Layer (HAL)
+## 標頭檔 `stm32f072xb.h` 之 Hardware Abstraction Layer (HAL)
 在嵌入式開發中，不直接操作雜亂的記憶體位址，而是透過 **結構體映射 (Struct Mapping)** 技術建立一套可讀性高、且符合工業標準（如 CMSIS）的抽象層
 ```
 #ifndef STM32F072XB_H
