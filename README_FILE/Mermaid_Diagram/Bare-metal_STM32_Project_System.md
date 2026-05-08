@@ -58,43 +58,30 @@ sequenceDiagram
         HW->>HW: 將封包中的 LBA 與 Len 從 Big Endian 翻轉為 little
         % Note over HW: Handle READ / WRITE
         Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
-        HW->>FTL: LBA, len, data buffer of READ/WRITE
+        HW->>FTL: 由 handle_nvme_write/read() 傳送資料 LBA, len, data buffer of READ/WRITE
         rect rgb(0, 0, 139)
             Note right of FTL: 寫入邏輯 (Out-of-place Update)
-            FTL->>FTL: allocate_page() 檢查 Free List
-            alt Free List 為空 (物理空間耗盡)
+            opt LBA 邊界檢查，是否超過 USER_PAGES
+                FTL-->>PC: [ERR] LBA Out of User Range
+            end
+            FTL->>FTL: allocate_page() 分配新頁面，檢查 Free List
+            opt Free List 為空 (物理空間耗盡)
                 FTL->>FTL: 觸發 Storage_GC()
                 FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
-                FTL->>FTL: 回還頁面至 Free List
+                Storage-->>FTL: 回還頁面至 Free List
+                opt GC 完，Free List 仍為空 (代表無 DIRTY 可以清還)
+                    FTL-->>PC: [ERR] DISK FULL ! Out of Physical Space!
+                end
+                
             end
-            FTL->>Storage: 物理寫入資料至新 PBA
+            FTL->>FTL: 將 old PBA 在 page_status 中標記為 STATE_DIRTY (下一次 GC可清還)
             FTL->>FTL: 更新 L2P 表: LBA -> New PBA
-            FTL->>FTL: 將舊 PBA 標記為 STATE_DIRTY
+            FTL->>Storage: 物理寫入資料至 New PBA
         end
-        FTL->>PC: 回傳 [ACK] READ_OK DATA: ... / [ACK] WRITE_OK (透過 UART)
+        FTL-->>PC: 回傳 [ACK] READ_OK DATA: ... / [ACK] WRITE_OK (透過 UART)
     else Checksum 錯誤
-        HW->>PC: 回傳 [ERR] Checksum Mismatch
+        HW-->>PC: 回傳 [ERR] Checksum Mismatch
     end
-
-    Note over Buffer, Storage: --- [階段四] FTL 指令解析與 GC 觸發 ---
-
-    Buffer->>FTL: 讀取 0xA5 起始字元，驗證 Checksum
-    FTL->>FTL: 端序轉換 (Big to Little Endian)
-    
-    rect rgb(0, 0, 139)
-        Note right of FTL: 寫入邏輯 (Out-of-place Update)
-        FTL->>FTL: allocate_page() 檢查 Free List
-        alt Free List 為空 (物理空間耗盡)
-            FTL->>FTL: 觸發 Storage_GC()
-            FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
-            FTL->>FTL: 回還頁面至 Free List
-        end
-        FTL->>Storage: 物理寫入資料至新 PBA
-        FTL->>FTL: 更新 L2P 表: LBA -> New PBA
-        FTL->>FTL: 將舊 PBA 標記為 STATE_DIRTY
-    end
-
-    FTL-->>PC: 回傳 ACK / DATA (透過 UART)
     
     Note over PC, HW: --- [異常處理] ORE Recovery ---
     PC->>HW: 模擬高流量導致 Overrun (ORE)
