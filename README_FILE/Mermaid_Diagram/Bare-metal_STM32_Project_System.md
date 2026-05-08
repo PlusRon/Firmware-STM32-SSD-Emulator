@@ -274,7 +274,7 @@ sequenceDiagram
 
 ### Booting (old)
 
-     ```mermaid
+```mermaid
       sequenceDiagram
         autonumber
         
@@ -313,7 +313,7 @@ sequenceDiagram
             HW->>SC: 寫入 0x05FA0004
             SC-->>HW: 執行 SYSRESETREQ
         end
-      ```
+```
 
 ### Origin
 ```mermaid
