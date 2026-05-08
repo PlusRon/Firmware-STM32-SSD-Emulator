@@ -264,14 +264,14 @@ sequenceDiagram
         HW-->>PC: 回傳 [SYS] ORE_ERROR
         HW->>Buffer: 執行 DMA_Init() & 清空緩衝區<br>(將 CNDTR 可用空間重設回 RX_BUF_SIZE 且 rd_ptr 指回 0)
     end
-        rect rgb(255, 240, 240)
+    rect rgb(255, 240, 240)
         Note over Aircr, HW: --- [異常處理] SCB異常重置 ---
         HW->>Aircr: 寫入 0x05FA0004
         Aircr-->>HW: 執行 SYSRESETREQ
     end
 
 ```
-
+### Origin
 ```mermaid
 sequenceDiagram
     autonumber
