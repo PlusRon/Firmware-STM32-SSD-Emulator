@@ -62,7 +62,7 @@ sequenceDiagram
         rect rgb(0, 0, 139)
             Note right of FTL: 寫入邏輯 (Out-of-place Update)
             opt LBA 邊界檢查，是否超過 USER_PAGES
-                FTL-->>PC: [ERR] LBA Out of User Range
+                FTL-->>PC: 回傳 [ERR] LBA Out of User Range
             end
             FTL->>FTL: allocate_page() 分配新頁面，檢查 Free List
             opt Free List 為空 (物理空間耗盡)
@@ -70,7 +70,7 @@ sequenceDiagram
                 FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
                 Storage-->>FTL: 回還頁面至 Free List
                 opt GC 完，Free List 仍為空 (代表無 DIRTY 可以清還)
-                    FTL-->>PC: [ERR] DISK FULL ! Out of Physical Space!
+                    FTL-->>PC: 回傳 [ERR] DISK FULL ! Out of Physical Space!
                 end
                 
             end
@@ -85,8 +85,10 @@ sequenceDiagram
     
     Note over PC, HW: --- [異常處理] ORE Recovery ---
     PC->>HW: 模擬高流量導致 Overrun (ORE)
-    HW->>Buffer: 偵測到 ORE 旗標
-    Buffer->>HW: 執行 DMA_Reset() & 清空緩衝區
+    HW->>Buffer: 將高流量資料寫入 Ring Buffer
+    Note over HW: UART-IRQ 偵測到 ORE 旗標
+    HW->>Buffer: 執行 DMA_Init() & 清空緩衝區<br>(將 CNDTR 可用空間重設回 RX_BUF_SIZE 且 rd_ptr 指回 0)
+    HW-->>PC: 回傳 [SYS] ORE_ERROR
     Buffer-->>PC: 回傳 "SYSTEM RECOVERED"
 ```
 
