@@ -6,6 +6,7 @@ sequenceDiagram
     autonumber
     
     participant PC as Host (Python Tester)
+    participant Aircr as AIRCR暫存器 (SCB)
     participant Systick as SysTick 硬體計數器
     participant HW as STM32 Hardware (CPU/DMA/UART/GPIO)
     participant Buffer as Ring Buffer (RAM)
@@ -87,9 +88,13 @@ sequenceDiagram
     PC->>HW: 模擬高流量導致 Overrun (ORE)
     HW->>Buffer: 將高流量資料寫入 Ring Buffer
     Note over HW: UART-IRQ 偵測到 ORE 旗標
-    HW->>Buffer: 執行 DMA_Init() & 清空緩衝區<br>(將 CNDTR 可用空間重設回 RX_BUF_SIZE 且 rd_ptr 指回 0)
     HW-->>PC: 回傳 [SYS] ORE_ERROR
-    Buffer-->>PC: 回傳 "SYSTEM RECOVERED"
+    HW->>Buffer: 執行 DMA_Init() & 清空緩衝區<br>(將 CNDTR 可用空間重設回 RX_BUF_SIZE 且 rd_ptr 指回 0)
+    rect rgb(0, 0, 139)
+        Note over Aircr, HW: --- [異常處理] SCB異常重置 ---
+        HW->>Aircr: 寫入 0x05FA0004
+        Aircr-->>HW: 執行 SYSRESETREQ
+    end
 ```
 
 ### Old Sequence Diagram
