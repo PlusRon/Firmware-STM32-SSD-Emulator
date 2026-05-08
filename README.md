@@ -4,7 +4,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
 從 **Linker Script** 與 **Startup** 純手寫開機流程，在 Linux 環境下建構自動化建置系統，並實做包含 **L2P 映射** 與 **GC** 機制的 **FTL 演算法**；底層架構整合自定義 **HAL** 與 **非阻塞式 SysTick**，並結合 **中斷驅動 (Interrupt-driven)** 架構搭配 **DMA、IDLE** 偵測 與 硬體流控技術，建構具備 **ORE 恢復機制** 與 **NVMe-like** 協定解析的高效能 **UART** 非同步通訊**環形緩衝區 (Ring Buffer)** 架構。
 
 ## 系統時序圖 (Sequence Diagram)
-<img src="images/System_Sequence_Diagram.png" alt="System Sequence Diagram" style="width:100%">
+<img src="images/Firmware-STM32-SSD-Emulator_System_SequenceDiagram.png" alt="System Sequence Diagram" style="width:100%">
 
 ## Outline
 #### [開發環境 (Environment Setup)](#一開發環境-Environment-Setup)
