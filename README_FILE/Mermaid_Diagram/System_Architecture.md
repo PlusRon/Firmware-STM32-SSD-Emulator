@@ -16,7 +16,7 @@ graph TD
     subgraph Layer1 ["【 底層驅動 與 緩衝】"]
         UART[UART / IDLE / DMA / NVIC]:::hardware
         RB[Ring Buffer]:::buffer
-        Tick[SysTick / 1ms]:::buffer
+        Tick[SysTick / 1ms]:::hardware
     end
 
     subgraph Layer2 ["【 核心邏輯控制 】"]
