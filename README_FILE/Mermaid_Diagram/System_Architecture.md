@@ -1,4 +1,55 @@
 ## 系統架構圖
+
+### Final Version
+```mermaid
+graph TD
+    %% 風格設定 (加大字體與線條感)
+    classDef hardware fill:#E67E22,stroke:#D35400,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef logic fill:#27AE60,stroke:#1E8449,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef buffer fill:#2980B9,stroke:#2471A3,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef storage fill:#8E44AD,stroke:#71338A,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef titleStyle fill:#34495E,stroke:#2C3E50,stroke-width:1px,color:#fff,font-weight:bold;
+
+    %% 外部輸入
+    PC((Host PC)) == "UART Link " ==> UART
+
+    subgraph Layer1 ["【 底層驅動 與 緩衝】"]
+        UART[UART / IDLE / DMA / NVIC]:::hardware
+        RB[Ring Buffer]:::buffer
+        Tick[SysTick / 1ms]:::buffer
+    end
+
+    subgraph Layer2 ["【 核心邏輯控制 】"]
+        Parser[NVMe Parser / Sync]:::logic
+        LED[LED Heartbeat]:::logic
+        FTL[FTL Engine]:::logic
+    end
+
+    subgraph Layer3 ["【 儲存 與 資源管理 】"]
+        GC[Garbage Collection]:::storage
+        Pool[Page Pool / Free List]:::storage
+        Flash[(L2P Map / Flash Simulation)]:::storage
+    end
+
+    %% 連接關係 (簡化路徑，避免扭曲)
+    UART -->|1. DMA 背景自動搬運| RB
+    RB -->|3. 指標比對 / 讀取指令流| Parser
+    UART -.->|2. ISR觸發解析| Parser
+    
+    Tick -.->|500ms 非阻塞觸發| LED
+    Parser --> FTL
+    
+    FTL <-->|4. 資源請求 / 檢查空間並分配| Pool
+    Pool -.->|空間不足觸發| GC
+    GC <-->| 搬移 與 抹除| Flash
+    FTL <==>|5. 更新L2P / 物理讀寫| Flash
+
+    %% 套用標題樣式
+    class Layer1,Layer2,Layer3 titleStyle;
+```
+
+
+---
 ### Version 1
 ```mermaid
 graph TB
@@ -322,3 +373,156 @@ graph TD
     FTL <==>|物理讀寫 & GC| Flash
 
 ```
+
+### Version 7
+```mermaid
+graph TD
+    %% 全域風格設定
+    classDef hardware fill:#E67E22,stroke:#D35400,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef logic fill:#27AE60,stroke:#1E8449,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef buffer fill:#2980B9,stroke:#2471A3,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef storage fill:#8E44AD,stroke:#71338A,stroke-width:2px,color:#fff,font-weight:bold;
+
+    %% 外部輸入
+    PC((Host PC)) == "UART Link" ==> UART
+
+    subgraph Hardware_Layer ["底層驅動層 (Drivers)"]
+        UART[UART / IDLE / ORE]:::hardware
+        DMA[DMA / CNDTR 指標]:::hardware
+        NVIC[NVIC 中斷控制]:::hardware
+    end
+
+    subgraph Buffer_Layer ["中介緩衝層 (Middleware)"]
+        RB[Ring Buffer]:::buffer
+        Tick[SysTick / 1ms]:::buffer
+    end
+
+    subgraph Application_Layer ["應用與邏輯層 (Main Loop)"]
+        Parser[NVMe Parser / Header Hunting]:::logic
+        LED[LED Heartbeat]:::logic
+        FTL[FTL Engine]:::logic
+        
+        subgraph GC_Module ["GC & 資源管理"]
+            GC[Garbage Collection]:::storage
+            Pool[Page Pool / Free List]:::storage
+        end
+    end
+
+    subgraph Storage_Layer ["實體存取層 (Storage)"]
+        L2P[L2P Map Table]:::storage
+        Flash[(Flash Simulation)]:::storage
+    end
+
+    %% --- 連接關係 ---
+    
+    %% 通訊路徑
+    UART <-->|背景自動搬運| DMA
+    DMA -->|硬體更新 wr_ptr| RB
+    UART -.->|IDLE / ORE 訊號| NVIC
+    NVIC -->|異常重置/同步| Parser
+    
+    %% 主迴圈驅動
+    RB -->|軟體檢查 rd_ptr| Parser
+    Tick -.->|500ms 非阻塞觸發| LED
+    
+    %% FTL 與 GC 核心邏輯
+    Parser -->|解析後調用| FTL
+    FTL <-->|1. 檢查空間| Pool
+    Pool -.->|2. 空間不足| GC
+    GC <-->|3. 數據搬移 & 抹除| Flash
+    GC -.->|4. 回還 Page| Pool
+    
+    %% 存取路徑
+    FTL <-->|5. 位址轉換| L2P
+    FTL <==>|6. 物理讀寫| Flash
+
+```
+
+### Version 8
+```mermaid
+graph TD
+    %% 風格設定：加大字體與區塊對比
+    classDef hardware fill:#E67E22,stroke:#D35400,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef logic fill:#27AE60,stroke:#1E8449,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef buffer fill:#2980B9,stroke:#2471A3,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef storage fill:#8E44AD,stroke:#71338A,stroke-width:2px,color:#fff,font-weight:bold;
+
+    %% 外部輸入
+    PC((Host)) == "UART" ==> UART
+
+    subgraph "Driver 層"
+        UART[UART / DMA]:::hardware
+        Tick[SysTick / 1ms]:::buffer
+    end
+
+    subgraph "Main Loop 控制層"
+        RB[Ring Buffer]:::buffer
+        Parser[Protocol Parser]:::logic
+        LED[Status LED]:::logic
+    end
+
+    subgraph "FTL 儲存核心"
+        FTL[FTL Engine]:::logic
+        GC[GC / Pool 管理]:::storage
+        Storage[L2P Map / Flash]:::storage
+    end
+
+    %% 核心資料流
+    UART -->|DMA 自動搬運| RB
+    RB -->|指標比對| Parser
+    Parser -->|調用| FTL
+    
+    %% 邏輯關聯
+    FTL <-->|資源調度| GC
+    FTL <==>|物理讀寫| Storage
+    Tick -.->|500ms 閃爍| LED
+```
+
+### Version 9
+```mermaid
+graph TD
+    %% 風格設定 (加大字體與線條感)
+    classDef hardware fill:#E67E22,stroke:#D35400,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef logic fill:#27AE60,stroke:#1E8449,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef buffer fill:#2980B9,stroke:#2471A3,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef storage fill:#8E44AD,stroke:#71338A,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef titleStyle fill:#34495E,stroke:#2C3E50,stroke-width:1px,color:#fff,font-weight:bold;
+
+    %% 外部輸入
+    PC((Host PC)) == "UART" ==> UART
+
+    subgraph Layer1 ["【底層驅動與緩衝】"]
+        UART[UART / DMA / NVIC]:::hardware
+        RB[Ring Buffer]:::buffer
+        Tick[SysTick / 1ms]:::buffer
+    end
+
+    subgraph Layer2 ["【核心邏輯控制】"]
+        Parser[NVMe Parser / Sync]:::logic
+        LED[Status LED]:::logic
+        FTL[FTL Engine]:::logic
+    end
+
+    subgraph Layer3 ["【儲存與資源管理】"]
+        GC[Garbage Collection]:::storage
+        Pool[Page Pool / Free List]:::storage
+        Flash[(L2P Map / Flash Simulation)]:::storage
+    end
+
+    %% 連接關係 (簡化路徑，避免扭曲)
+    UART -->|DMA 自動搬運| RB
+    RB -->|指標比對| Parser
+    UART -.->|中斷控制| Parser
+    
+    Tick -.->|500ms| LED
+    Parser --> FTL
+    
+    FTL <-->|資源請求| Pool
+    Pool -.->|觸發| GC
+    GC <-->|搬移與抹除| Flash
+    FTL <==>|物理讀寫| Flash
+
+    %% 套用標題樣式
+    class Layer1,Layer2,Layer3 titleStyle;
+```
+
