@@ -1,6 +1,65 @@
 ## 系統架構圖
 
 ### Final Version
+#### Mermaid + HTML Label
+```mermaid
+graph TD
+    %% 風格設定 (加大字體與線條感)
+    classDef hardware fill:#E67E22,stroke:#D35400,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef logic fill:#27AE60,stroke:#1E8449,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef buffer fill:#2980B9,stroke:#2471A3,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef storage fill:#8E44AD,stroke:#71338A,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef titleStyle fill:#34495E,stroke:#2C3E50,stroke-width:1px,color:#fff,font-weight:bold;
+
+    %% 外部輸入
+    %% PC((Host PC)) == "UART Link " ==> UART
+
+    subgraph Layer1 ["<span style='font-size:18px'>【 底層驅動 與 緩衝 】</span>"]
+        %% UART[UART / IDLE / DMA / NVIC]:::hardware
+        UART["<span style='font-size:15px'>UART / IDLE / DMA / NVIC</span>"]:::hardware
+        %% RB[Ring Buffer]:::buffer
+        RB["<span style='font-size:18px'>Ring Buffer</span>"]:::buffer
+        %% Tick[SysTick / 1ms]:::hardware
+        Tick["<span style='font-size:18px'>SysTick / 1ms</span>"]:::hardware
+    end
+
+    subgraph Layer2 ["<span style='font-size:18px'>【 核心邏輯控制 】</span>"]
+        %% Parser[NVMe Parser / Sync]:::logic
+        %% LED[LED Heartbeat]:::logic
+        %% FTL[FTL Engine]:::logic
+        Parser["<span style='font-size:18px'>NVMe Parser</span>"]:::logic
+        LED["<span style='font-size:18px'>LED Heartbeat</span>"]:::logic
+        FTL["<span style='font-size:18px'>FTL Engine</span>"]:::logic
+    end
+
+    subgraph Layer3 ["<span style='font-size:18px'>【 儲存 與 資源管理 】</span>"]
+        %% GC[Garbage Collection]:::storage
+        %% Pool[Page Pool / Free List]:::storage
+        %% Flash[(L2P Map / Flash Simulation)]:::storage
+        Pool["<span style='font-size:18px'>Page Pool / Free List</span>"]:::storage
+        GC["<span style='font-size:18px'>Garbage Collection</span>"]:::storage
+        Flash["<span style='font-size:17px'>L2P / Flash Simulation</span>"]:::storage
+    end
+
+    %% 連接關係 (簡化路徑，避免扭曲)
+    UART -->|1. DMA 背景自動搬運| RB
+    RB -->|3. 指標比對 / 讀取指令流| Parser
+    UART -.->|2. ISR觸發解析| Parser
+    
+    Tick -.->|500ms 非阻塞觸發| LED
+    Parser --> FTL
+    
+    FTL <-->|4. 資源請求 / 檢查空間並分配| Pool
+    Pool -.->|空間不足觸發| GC
+    GC <-->| 搬移 與 抹除| Flash
+    FTL <==>|5. 更新L2P / 物理讀寫| Flash
+
+    %% 套用標題樣式
+    class Layer1,Layer2,Layer3 titleStyle;
+
+```
+
+#### Mermaid 
 ```mermaid
 graph TD
     %% 風格設定 (加大字體與線條感)
@@ -46,6 +105,55 @@ graph TD
 
     %% 套用標題樣式
     class Layer1,Layer2,Layer3 titleStyle;
+```
+#### Mermaid 
+```mermaid
+graph TD
+    %% 風格設定 (加大字體與線條感)
+    classDef hardware fill:#E67E22,stroke:#D35400,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef logic fill:#27AE60,stroke:#1E8449,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef buffer fill:#2980B9,stroke:#2471A3,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef storage fill:#8E44AD,stroke:#71338A,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef titleStyle fill:#34495E,stroke:#2C3E50,stroke-width:1px,color:#fff,font-weight:bold;
+
+    %% 外部輸入
+    %% PC((Host PC)) == "UART Link " ==> UART
+
+    subgraph Layer1 ["【 底層驅動 與 緩衝】"]
+        UART[UART / IDLE / DMA / NVIC]:::hardware
+        RB[Ring Buffer]:::buffer
+        Tick[SysTick / 1ms]:::hardware
+    end
+
+    subgraph Layer2 ["【 核心邏輯控制 】"]
+        Parser[NVMe Parser / Sync]:::logic
+        LED[LED Heartbeat]:::logic
+        FTL[FTL Engine]:::logic
+    end
+
+    subgraph Layer3 ["【 儲存 與 資源管理 】"]
+        GC[Garbage Collection]:::storage
+        Pool[Page Pool / Free List]:::storage
+        Flash[(L2P Map / Flash Simulation)]:::storage
+    end
+
+    %% 連接關係 (簡化路徑，避免扭曲)
+    UART -->|1. DMA 背景自動搬運| RB
+    RB -->|3. 指標比對 / 讀取指令流| Parser
+    UART -.->|2. ISR觸發解析| Parser
+    
+    Tick -.->|500ms 非阻塞觸發| LED
+    Parser --> FTL
+    
+    FTL <-->|4. 資源請求 / 檢查空間並分配| Pool
+    Pool -.->|空間不足觸發| GC
+    GC <-->| 搬移 與 抹除| Flash
+    FTL <==>|5. 更新L2P / 物理讀寫| Flash
+
+    %% 套用標題樣式
+    class Layer1,Layer2,Layer3 titleStyle;
+
+
 ```
 
 
