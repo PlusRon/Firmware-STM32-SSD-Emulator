@@ -93,3 +93,60 @@ sequenceDiagram
     end
 
 ```
+
+### FTL : L2P + GC
+```mermaid
+%%{init: { 'themeVariables': { 'fontSize': '24px', 'fontFamily': 'Arial'}}}%%
+
+sequenceDiagram
+    autonumber
+    
+    participant PC as Host (Python Tester)
+    %% participant Aircr as AIRCR暫存器 (SCB)
+    %% participant Systick as SysTick 硬體計數器
+    participant HW as STM32 Hardware (CPU/DMA/UART/GPIO)
+    %% participant Buffer as Ring Buffer (RAM)
+    %% participant Startup as  Linker & Startup (.ld/.c)
+    %% participant Ram as RAM
+    participant FTL as FTL Logic (L2P/GC)
+    participant Storage as Physical Flash
+
+
+    
+
+    alt Checksum 正確
+        Note over HW: __builtin_bswap16()
+        HW->>HW: 將封包中的 LBA 與 len 從 Big Endian 翻轉為 little endian
+        rect rgb(210, 240, 210)
+            Note over PC, Storage: --- [階段四] FTL (Out-of-place update, L2P, GC ) 觸發 ---
+            HW->>FTL: 由 handle_nvme_write/read() <br/>傳送資料 LBA, len, data buffer of READ/WRITE
+        
+            Note right of FTL: 寫入邏輯<br>(Out-of-place Update)
+            opt LBA 邊界檢查，是否超過 USER_PAGES
+                FTL-->>PC: 回傳 [ERR] LBA Out of User Range
+            end
+            FTL->>FTL: allocate_page() 分配新頁面，檢查 Free List
+            opt Free List 為空 (物理空間耗盡)
+                FTL->>FTL: 觸發 Storage_GC()
+                FTL->>Storage: 掃描 DIRTY 頁面並抹除 (0xFF)
+                Storage-->>FTL: 回還頁面至 Free List
+                opt GC 完，Free List 仍為空 (代表無 DIRTY 可以清還)
+                    FTL-->>PC: 回傳 [ERR] DISK FULL ! Out of Physical Space!
+                end
+                
+            end
+            FTL->>FTL: 將 old PBA 在 page_status 中標記為 STATE_DIRTY (下一次 GC可清還)
+            FTL->>FTL: 更新 L2P 表: LBA -> New PBA
+            FTL->>Storage: 物理寫入資料至 New PBA
+            FTL-->>PC: 回傳 [ACK] READ_OK DATA: ... / [ACK] WRITE_OK (透過 UART)
+        end
+        
+    else Checksum 錯誤
+        HW-->>PC: 回傳 [ERR] Checksum Mismatch
+    end
+    
+
+
+
+
+```
