@@ -63,8 +63,8 @@ void Storage_GC(void) {
             // 模擬抹除動作：將資料填回 0xFF
             uint8_t b = i / PAGES_PER_BLOCK;
             uint8_t p = i % PAGES_PER_BLOCK;
-            for(int i = 0; i < PAGE_SIZE; i++) {
-                flash_memory[b][p][i] = 0xFF;
+            for(int j = 0; j < PAGE_SIZE; j++) {
+                flash_memory[b][p][j] = 0xFF;
             }
             
             // 還給空閒鏈表
