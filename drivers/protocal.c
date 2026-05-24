@@ -27,8 +27,8 @@ void Protocol_Parse(uint8_t *packet_buf) {
         return; // 放棄該封包，不執行指令
     }
 
-    // uint16_t lba = (uint16_t)((packet_buf[3] << 8) | packet_buf[2]);
-    // uint16_t len = (uint16_t)((packet_buf[5] << 8) | packet_buf[4]);
+    // uint16_t lba = (uint16_t)((packet_buf[2] << 8) | packet_buf[3]);
+    // uint16_t len = (uint16_t)((packet_buf[4] << 8) | packet_buf[5]);
 
     // 3. 處理位元組序 (Endianness)：使用內建指令將大端序(Host)轉為小端序(STM32)
     uint16_t lba = (uint16_t)__builtin_bswap16(cmd->lba);
