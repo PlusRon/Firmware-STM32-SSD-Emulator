@@ -54,10 +54,21 @@ void handle_nvme_read(uint16_t lba, uint16_t len) {
 }
 
 void handle_nvme_write(uint16_t lba, uint16_t len) {
+
+    // 防禦性程式設計：如果傳進來的 len 跟我們的 PAGE_SIZE 不符，印出警告
+    if (len != PAGE_SIZE) {
+        UART_Send(USART1, "[WARN] Misaligned write detected! RMW logic needed.\r\n");
+        // 目前測試階段，我們強制將 len 修正為 PAGE_SIZE 進行 Pattern 模擬
+        len = PAGE_SIZE;
+    }
+    
+    // 自動產生漸變 Pattern 資料
     for (int i = 0; i < PAGE_SIZE; i++) {
         g_data_buf[i] = (uint8_t)(lba + i);
     }
     
+    // 呼叫 FTL 的寫入介面
     Storage_Write(lba, g_data_buf);
+    
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }
