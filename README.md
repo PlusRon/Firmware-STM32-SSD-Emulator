@@ -3,8 +3,8 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
 
 從 **Linker Script** 與 **Startup** 純手寫開機流程，在 Linux 環境下建構自動化建置系統，並實做包含 **L2P 映射** 與 **GC** 機制的 **FTL 演算法**；底層架構整合自定義 **HAL** 與 **非阻塞式 SysTick**，並結合 **中斷驅動 (Interrupt-driven)** 架構搭配 **DMA、IDLE** 偵測 與 硬體流控技術，建構具備 **ORE 恢復機制** 與 **NVMe-like** 協定解析的高效能 **UART** 非同步通訊**環形緩衝區 (Ring Buffer)** 架構。
 
-## 系統時序圖 (Sequence Diagram)
-<img src="images/Firmware-STM32-SSD-Emulator_System_SequenceDiagram.png" alt="System Sequence Diagram" style="width:100%">
+## 系統架構圖 (System Architecture)
+<img src="images/System_Architecture_Final.png" alt="System Sequence Diagram" style="width:100%">
 
 ## Outline
 #### [系統時序圖 (Sequence Diagram)](#系統時序圖-Sequence-Diagram)
@@ -48,8 +48,9 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
   |各周邊 **暫存器位元 (Bit)** 定義|[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)|各周邊(Peripheral) 章節末尾的 **Register description**|
   |**時脈樹 (Clock Tree)** 頻率|[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)|**Reset and clock control (RCC)**/Clock tree、HSI clock|
   |引腳 **複用功能 (AF)** 對照表|[Datasheet (DS9826)](https://www.st.com/resource/en/datasheet/stm32f072c8.pdf)|Pinouts and pin descriptions / **Alternate functions**|
-  |**系統控制** 相關的 **暫存器**|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|**System control block (SCB)**/AIRCR|
-  |處理器異常與中斷架構|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|Exception model / NVIC|
+  |**系統控制** 相關的 **暫存器 (含系統例外)**|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|**System control block (SCB)** / AIRCR / SysTick|
+  |處理器異常與中斷架構|[Programming Manual (PM0215)](https://www.st.com/resource/en/programming_manual/pm0215-stm32f0-series-cortexm0-programming-manual-stmicroelectronics.pdf)|Exception model / NVIC 的 ISER|
+  |Interrupts and events |[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)|**Vector Table** / ISER 暫存器腳位 / 中斷優先順序|
 
 - **鎖定硬體邊界 (Memory Mapping)** ：根據 STM32F072 的 **[Reference Manual (RM0091)](https://www.st.com/resource/en/reference_manual/rm0091-stm32f0x1stm32f0x2stm32f0x8-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)**，找出晶片的實體記憶體佈局
   - FLASH (唯讀儲存) : 起始於 `0x08000000`，容量 **128 KB**
@@ -80,7 +81,7 @@ Hand-authored bare-metal **boot sequence** and Linux-based build system. Impleme
     - **中斷向量表 (Vector Table)** : 根據 ARM Cortex-M 規範，CPU 啟動後會優先讀取 FLASH 起始處
     - **Reset_Handler 程式**： 資料搬家 與 環境初始化
     - **控制 SCB (System Control Block) 的 SYSRESETREQ** : 使異常時能自動恢復與軟體重置
-  - #### UML
+  - #### Squence Diagram
     <img src="images/Boot_SequenceDiagram.png" alt="System Sequence Diagram" style="width:100%">
  
 ## 三、主程式碼實作 (Implementation)

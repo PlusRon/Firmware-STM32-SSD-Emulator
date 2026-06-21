@@ -1,8 +1,9 @@
 #include "protocol.h"
 #include "usart.h"
+#include "storage.h"
+#include <string.h>
 
-// 模擬快閃記憶體 (NAND Flash) 的儲存空間，大小為 512 Bytes
-static uint8_t virtual_disk[512];
+__attribute__((aligned(4))) static uint8_t g_data_buf[PAGE_SIZE];
 
 void Protocol_Parse(uint8_t *packet_buf)
 {
@@ -19,7 +20,7 @@ void Protocol_Parse(uint8_t *packet_buf)
     // 2. 驗證 Checksum：若計算結果與封包內的 checksum 不符，判定為雜訊或傳輸錯誤
     if (calculated_cs != cmd->checksum)
     {
-        UART_Send(USART1, "[ERR] Checksum Mismatch!\r\n");
+        UART_Send(USART1, "[ERR] CS Mismatch!\r\n");
         UART_Send(USART1, "  Received: 0x");
         UART_SendChar(USART1, cmd->checksum); // 顯示封包帶來的 CS
         UART_Send(USART1, "\r\n  Expected: 0x");
@@ -31,21 +32,24 @@ void Protocol_Parse(uint8_t *packet_buf)
     // 3. 處理位元組序 (Endianness)：使用內建指令將大端序(Host)轉為小端序(STM32)
     uint16_t lba = (uint16_t)__builtin_bswap16(cmd->lba);
     uint16_t len = (uint16_t)__builtin_bswap16(cmd->length);
+    // uint16_t lba = (uint16_t)((packet_buf[2] << 8) | packet_buf[3]);
+    // uint16_t len = (uint16_t)((packet_buf[4] << 8) | packet_buf[5]);
     /*
-    // 針對 STM32 優化的大端轉小端
-    static inline uint16_t swap_uint16(uint16_t val) {
-        return __builtin_bswap16(val);
-    }
+   // 針對 STM32 優化的大端轉小端
+   static inline uint16_t swap_uint16(uint16_t val) {
+       return __builtin_bswap16(val);
+   }
 
-    // 針對「可能不對齊」的緩衝區讀取大端數值
-    static inline uint16_t read_be16(const uint8_t *ptr) {
-        return (uint16_t)((ptr[0] << 8) | ptr[1]);
-    }
-    */
+   // 針對「可能不對齊」的緩衝區讀取大端數值
+   static inline uint16_t read_be16(const uint8_t *ptr) {
+       return (uint16_t)((ptr[0] << 8) | ptr[1]);
+   }
+   */
 
     // 4. 指令派發 (Command Dispatching)
     if (cmd->opcode == NVME_OP_READ)
     {
+
         handle_nvme_read(lba, len);
     }
     else if (cmd->opcode == NVME_OP_WRITE)
@@ -63,22 +67,24 @@ void handle_nvme_read(uint16_t lba, uint16_t len)
 {
     // 將長度限制在「虛擬磁碟的大小」以內，防止非法存取
     // uint16_t safe_len = (len > 512) ? 512 : len;
+    Storage_Read(lba, g_data_buf);
 
-    UART_Send(USART1, "[ACK] READ_OK:");
-    // 限制讀取長度，避免非法存取，並循環模擬磁碟空間
+    UART_Send(USART1, "[ACK] DATA:");
+    // for (int i = 0; i < 8; i++) {
     for (int i = 0; i < (len > 16 ? 16 : len); i++)
-    {
-        UART_SendChar(USART1, virtual_disk[(lba + i) % 512]);
-    }
-    UART_Send(USART1, "\r\n");
+        UART_SendChar(USART1, g_data_buf[i]);
+}
+UART_Send(USART1, "\r\n");
 }
 
 void handle_nvme_write(uint16_t lba, uint16_t len)
 {
     // 模擬寫入邏輯：將 LBA 地址轉換為資料存入，用於後續讀取驗證
-    for (int i = 0; i < (len > 16 ? 16 : len); i++)
+    for (int i = 0; i < PAGE_SIZE; i++)
     {
-        virtual_disk[(lba + i) % 512] = (uint8_t)(lba + i);
+        g_data_buf[i] = (uint8_t)(lba + i);
     }
+
+    Storage_Write(lba, g_data_buf);
     UART_Send(USART1, "[ACK] WRITE_OK\r\n");
 }
