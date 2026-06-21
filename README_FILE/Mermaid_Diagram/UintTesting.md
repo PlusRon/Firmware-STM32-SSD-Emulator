@@ -1,5 +1,53 @@
 ```mermaid
 graph TD
+    %% ==========================================
+    %% 【左/上方】底層驅動與協議實作（AI 強力輔助）
+    %% ==========================================
+    AI_Comm["🤖 AI 輔助 系統連線建置 :<ul style='text-align:left'><li>1. PySerial 序列埠連線</li><li>2. 封裝標頭與大端序結構體</li></ul>"]:::ai
+    
+    %% AI_Tx[🤖 AI 自動化: <br> 快速封裝 A5 標頭與大端序結構體]:::ai
+    %% AI_Rx[🤖 AI 自動化: <br> 快速實作非阻塞接收與 32B 解析]:::ai
+
+    %% 連線指向核心引擎
+    AI_Comm --> Core
+    %% AI_Tx --> Core
+    %% AI_Rx --> Core
+
+    %% ==========================================
+    %% 【中央主幹】核心架構與大底階梯（工程師主導定義）
+    %% ==========================================
+    Core[A. 自動化核心測試引擎 <br> PC ↔ STM32 連線、傳輸、接收]:::engineer
+    
+    Core --> Step1[STEP 1. 基本讀寫<br> STEP 2. 空間壓測]:::process
+    Step1 --> Step2[STEP 3. 邊界讀寫<br> STEP 4. 錯誤注入]:::highlight
+    Step2 --> Step3[STEP 5. 硬體發生 ORE<br>STEP 6. FTL 耗盡、GC]:::highlight
+    
+    %% ==========================================
+    %% 【右側切入】極端異常與壓力注入（AI 破壞性生成）
+    %% ==========================================
+    %% AI1[🤖 AI 異常測資: <br> 自動注入算錯的 Checksum]:::ai --> Step2
+    AI1["🤖 AI 輔助 生成異常測資 :<ul style='text-align:left'><li>1. 寫入越界 LBA</li><li>2. 注入錯誤 Checksum </li><li>3. 注入無效 Opcode </li></ul>"]:::ai--> Step2
+
+    %% AI2[🤖 AI 破壞性時序: <br> 模擬中斷過載與 50次高頻寫入]:::ai --> Step3
+    AI2["🤖 AI 輔助 破壞系統 :<ul style='text-align:left'><li>1. 模擬中斷過載觸發 ORE </li><li>2. 高頻寫入相同 LBA , 異地更新</li><li>3. 耗盡 PBA 執行 GC 資料回收 </li></ul>"]:::ai--> Step3
+    
+    %% 結束
+    Step3 --> End([B. 產出統計報告 Pass / Fail ]):::output
+
+    %% ==========================================
+    %% PPT 高對比度色彩配置
+    %% ==========================================
+    classDef engineer fill:#1e3a8a,stroke:#172554,stroke-width:2.5px,color:#fff;
+    %% classDef ai fill:#16a34a,stroke:#14532d,stroke-width:2.5px,color:#fff;
+    classDef ai fill:#e6f4ea,stroke:#34a853,stroke-width:2.5px,color:#137333;
+    classDef process fill:#f8fafc,stroke:#cbd5e1,stroke-width:2.5px,color:#334155;
+    classDef highlight fill:#fef08a,stroke:#ca8a04,stroke-width:2.5px,color:#000;
+    classDef output fill:#fde8e8,stroke:#f8b4b4,stroke-width:2.5px,color:#9b1c1c;
+```
+
+
+```mermaid
+graph TD
     %% 核心架構（工程師主導）
     Core[1. 自動化核心引擎 <br> PC ↔ STM32 連線與讀寫]:::engineer
     
