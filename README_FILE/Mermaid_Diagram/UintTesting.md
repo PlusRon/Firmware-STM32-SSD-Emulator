@@ -34,6 +34,8 @@ graph TD
     %% 結束
     Step3 --> End([B. 產出統計報告 Pass / Fail ]):::output
 
+    AI["🤖 AI 輔助 視覺化 Log :<ul style='text-align:left'><li>1. 自動配置 ANSI 顏色代碼</li><li>2. 即時統計 PASS / FAIL 燈號</li></ul>"]:::ai--> End
+
     %% ==========================================
     %% PPT 高對比度色彩配置
     %% ==========================================
@@ -43,6 +45,7 @@ graph TD
     classDef process fill:#f8fafc,stroke:#cbd5e1,stroke-width:2.5px,color:#334155;
     classDef highlight fill:#fef08a,stroke:#ca8a04,stroke-width:2.5px,color:#000;
     classDef output fill:#fde8e8,stroke:#f8b4b4,stroke-width:2.5px,color:#9b1c1c;
+
 ```
 
 
